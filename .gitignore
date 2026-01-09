@@ -1,0 +1,18 @@
+# Các thư mục chứa thư viện (Rất nặng, không được upload)
+node_modules/
+
+# Các file log (lưu vết lỗi khi chạy)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# File chứa biến môi trường (Nếu sau này bạn dùng file .env để giấu mật khẩu/token)
+.env
+
+# File hệ điều hành sinh ra (không cần thiết cho code)
+.DS_Store
+Thumbs.db
+
+# Thư mục của các trình soạn thảo code
+.vscode/
+.idea/
