@@ -62,20 +62,18 @@ export default class GameScene extends Phaser.Scene {
             .setInteractive();
 
         playerBtn.on('pointerdown', () => {
-            this.role = 'player';
             playerBtn.destroy();
             hostBtn.destroy();
-            this.socket.emit('selectRole', 'player');
-            this.showWaitingText();
+            this.showPlayerNameInput();
         });
 
         hostBtn.on('pointerdown', () => {
-            this.role = 'host';
             playerBtn.destroy();
             hostBtn.destroy();
-            this.socket.emit('selectRole', 'host');
+            this.showHostPasswordInput();
         });
     }
+
 
     createAnimations() {
         if (!this.anims.exists('horse_run')) {
@@ -181,6 +179,11 @@ export default class GameScene extends Phaser.Scene {
             }
             this.startCountdown();
         });
+
+        this.socket.on('raceFinished', (data) => {
+            this.isRaceStarted = false;
+            this.showWinnerBanner(data.winnerName);
+        });
     }
 
     // --- PLAYERS ---
@@ -191,7 +194,8 @@ export default class GameScene extends Phaser.Scene {
             playerInfo.y,
             'horse',
             playerInfo.id,
-            playerInfo.horseColor
+            playerInfo.horseColor,
+            playerInfo.name
         );
 
         this.horse.setDepth(DEPTH.HORSE);
@@ -206,7 +210,8 @@ export default class GameScene extends Phaser.Scene {
             playerInfo.y,
             'horse',
             playerInfo.id,
-            playerInfo.horseColor
+            playerInfo.horseColor,
+            playerInfo.name
         );
 
         otherPlayer.setDepth(DEPTH.HORSE);
@@ -333,6 +338,153 @@ export default class GameScene extends Phaser.Scene {
         return leader;
     }
 
+    showPlayerNameInput() {
+        const cx = this.cameras.main.centerX;
+
+        const dom = this.add.dom(cx, 300).createFromHTML(`
+        <div style="text-align:center">
+            <div style="color:#5dfc9b;font-family:monospace;font-size:20px;margin-bottom:10px">
+                ENTER NAME
+            </div>
+            <input id="playerName" type="text"
+                   style="${PIXEL_INPUT_STYLE}" />
+            <br/><br/>
+            <button id="joinBtn" style="${PIXEL_BTN_STYLE}">
+                JOIN
+            </button>
+        </div>
+    `).setDepth(DEPTH.UI).setScrollFactor(0);
+
+        dom.addListener('click');
+        dom.on('click', (e) => {
+            if (e.target.id === 'joinBtn') {
+                const name = dom.getChildByID('playerName').value.trim();
+                if (!name) return;
+
+                this.role = 'player';
+                dom.destroy();
+
+                this.socket.emit('selectRole', {
+                    role: 'player',
+                    name
+                });
+
+                this.showWaitingText();
+            }
+        });
+    }
+
+    showHostPasswordInput() {
+        const cx = this.cameras.main.centerX;
+
+        const dom = this.add.dom(cx, 300).createFromHTML(`
+        <div style="text-align:center">
+            <div style="color:#ff1744;font-family:monospace;font-size:20px;margin-bottom:10px">
+                HOST ACCESS
+            </div>
+            <input id="hostPass" type="password"
+                   style="${PIXEL_INPUT_STYLE}" />
+            <br/><br/>
+            <button id="hostBtn" style="${PIXEL_BTN_STYLE}">
+                CONFIRM
+            </button>
+            <div id="error"
+                 style="color:#ff1744;font-family:monospace;font-size:14px;margin-top:8px;display:none">
+                INVALID PASSWORD
+            </div>
+        </div>
+    `).setDepth(DEPTH.UI).setScrollFactor(0);
+
+        dom.addListener('click');
+
+        dom.on('click', (e) => {
+            if (e.target.id === 'hostBtn') {
+                const password = dom.getChildByID('hostPass').value.trim();
+                if (!password) return;
+
+                this.role = 'host';
+
+                this.socket.emit('selectRole', {
+                    role: 'host',
+                    password
+                });
+            }
+        });
+
+        this.socket.once('hostRejected', () => {
+            dom.getChildByID('error').style.display = 'block';
+        });
+
+        this.socket.once('hostAccepted', () => {
+            dom.destroy();
+        });
+    }
+
+    showWinnerBanner(winnerName) {
+        const cx = this.cameras.main.centerX;
+        const cy = this.cameras.main.centerY;
+
+        // nền tối
+        const overlay = this.add.rectangle(
+            cx, cy,
+            this.cameras.main.width,
+            this.cameras.main.height,
+            0x000000, 0.6
+        ).setScrollFactor(0).setDepth(DEPTH.UI);
+
+        // khung pixel
+        const frame = this.add.graphics()
+            .lineStyle(4, 0x5dfc9b)
+            .fillStyle(0x003b1f, 1)
+            .fillRect(-220, -80, 440, 160)
+            .strokeRect(-220, -80, 440, 160);
+
+        // text WINNER
+        const title = this.add.text(0, -30, 'WINNER!', {
+            fontFamily: 'monospace',
+            fontSize: '36px',
+            color: '#ffeb3b',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+
+        const nameText = this.add.text(0, 25, winnerName, {
+            fontFamily: 'monospace',
+            fontSize: '28px',
+            color: '#5dfc9b',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+
+        const container = this.add.container(cx, cy, [
+            frame, title, nameText
+        ])
+            .setScrollFactor(0)
+            .setDepth(DEPTH.UI)
+            .setScale(0);
+
+        // animation pixel pop
+        this.tweens.add({
+            targets: container,
+            scale: 1,
+            duration: 200,
+            ease: 'Back.Out'
+        });
+
+        // auto fade sau 3s
+        // this.time.delayedCall(3000, () => {
+        //     this.tweens.add({
+        //         targets: [container, overlay],
+        //         alpha: 0,
+        //         duration: 500,
+        //         onComplete: () => {
+        //             container.destroy();
+        //             overlay.destroy();
+        //         }
+        //     });
+        // });
+    }
+
     update() {
         if (this.role === 'host' && this.isRaceStarted) {
             const leader = this.getLeadingHorse();
@@ -342,3 +494,24 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 }
+
+const PIXEL_INPUT_STYLE = `
+    background: #111;
+    color: #5dfc9b;
+    border: 3px solid #5dfc9b;
+    font-family: monospace;
+    font-size: 18px;
+    padding: 8px;
+    outline: none;
+    box-shadow: 0 0 0 3px #003b1f inset;
+`;
+
+const PIXEL_BTN_STYLE = `
+    background: #003b1f;
+    color: #5dfc9b;
+    border: 3px solid #5dfc9b;
+    font-family: monospace;
+    font-size: 18px;
+    padding: 8px 20px;
+    cursor: pointer;
+`;
