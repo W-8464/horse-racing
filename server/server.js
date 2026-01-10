@@ -7,19 +7,30 @@ const path = require('path');
 app.use(express.static(path.join(__dirname, '../client')));
 
 const players = {};
+const HOST_PASSWORD = 'admin123';
 let gameState = {
     status: 'LOBBY', // LOBBY | COUNTDOWN | RUNNING
     hostId: null
 };
+let winnerId = null;
+const FINISH_LINE_X = 2000;
 
 io.on('connection', (socket) => {
     console.log('Người chơi mới:', socket.id);
 
-    socket.on('selectRole', (role) => {
+    socket.on('selectRole', (data) => {
+        const { role, name, password } = data;
         socket.role = role;
 
         if (role === 'host') {
+            if (password !== HOST_PASSWORD) {
+                socket.emit('hostRejected', 'INVALID_PASSWORD');
+                return;
+            }
+
             gameState.hostId = socket.id;
+
+            socket.emit('currentPlayers', players);
             socket.emit('hostAccepted');
             return;
         }
@@ -32,6 +43,7 @@ io.on('connection', (socket) => {
             x: 150,
             y: skyHeight + padding + ((Object.keys(players).length % 6) * 70),
             id: socket.id,
+            name,
             horseColor: randomColor
         };
 
@@ -43,6 +55,8 @@ io.on('connection', (socket) => {
     socket.on('hostStartGame', () => {
         if (socket.id !== gameState.hostId) return;
 
+        winnerId = null;
+
         gameState.status = 'COUNTDOWN';
         io.emit('startCountdown');
     });
@@ -51,6 +65,17 @@ io.on('connection', (socket) => {
         if (!players[socket.id]) return;
 
         players[socket.id].x = data.x;
+
+        // 🏁 CHECK WIN
+        if (!winnerId && data.x >= FINISH_LINE_X) {
+            winnerId = socket.id;
+
+            io.emit('raceFinished', {
+                winnerId: socket.id,
+                winnerName: players[socket.id].name
+            });
+        }
+
         socket.broadcast.emit('playerMoved', players[socket.id]);
     });
 
@@ -61,7 +86,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('resetRace', () => {
-        isRaceStarted = false;
+        winnerId = null;
+        gameState.status = 'LOBBY';
         Object.values(players).forEach(p => p.x = 150);
         io.emit('raceReset', players);
     });

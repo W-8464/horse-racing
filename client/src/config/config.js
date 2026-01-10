@@ -1,6 +1,9 @@
 export const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
+    dom: {
+        createContainer: true // 🔥 BẮT BUỘC
+    },
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
