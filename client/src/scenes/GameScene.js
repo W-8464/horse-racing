@@ -51,29 +51,28 @@ export default class GameScene extends Phaser.Scene {
     createModeSelectionUI() {
         const cx = this.cameras.main.centerX;
 
-        const playerBtn = this.add.text(cx, 260, 'PLAYER', { fontSize: '32px' })
+        this.playerBtn = this.add.text(cx, 260, 'PLAYER', { fontSize: '32px' })
             .setOrigin(0.5)
             .setDepth(DEPTH.UI)
             .setInteractive();
 
-        const hostBtn = this.add.text(cx, 320, 'HOST', { fontSize: '32px' })
+        this.hostBtn = this.add.text(cx, 320, 'HOST', { fontSize: '32px' })
             .setOrigin(0.5)
             .setDepth(DEPTH.UI)
             .setInteractive();
 
-        playerBtn.on('pointerdown', () => {
-            playerBtn.destroy();
-            hostBtn.destroy();
+        this.playerBtn.on('pointerdown', () => {
+            this.playerBtn.destroy();
+            this.hostBtn.destroy();
             this.showPlayerNameInput();
         });
 
-        hostBtn.on('pointerdown', () => {
-            playerBtn.destroy();
-            hostBtn.destroy();
+        this.hostBtn.on('pointerdown', () => {
+            this.playerBtn.destroy();
+            this.hostBtn.destroy();
             this.showHostPasswordInput();
         });
     }
-
 
     createAnimations() {
         if (!this.anims.exists('horse_run')) {
@@ -88,7 +87,7 @@ export default class GameScene extends Phaser.Scene {
 
     setupInputs() {
         this.input.on('pointerdown', (pointer) => {
-            if (!this.isRaceStarted || this.isFinished || !this.horse) return;
+            if (!this.isRaceStarted || this.isFinished || !this.horse || this.role !== 'player') return;
 
             if (this.flashButton && this.flashButton.getBounds().contains(pointer.x, pointer.y)) return;
 
@@ -168,6 +167,24 @@ export default class GameScene extends Phaser.Scene {
         });
 
         this.socket.on('startCountdown', () => {
+            const domElements = document.querySelectorAll('input, button');
+            domElements.forEach(el => el.remove());
+
+            this.clearAllUI();
+
+            if (this.playerBtn) this.playerBtn.destroy();
+            if (this.hostBtn) this.hostBtn.destroy();
+
+            if (this.winnerContainer) {
+                this.winnerContainer.destroy();
+                this.winnerContainer = null;
+            }
+
+            if (this.winnerOverlay) {
+                this.winnerOverlay.destroy();
+                this.winnerOverlay = null;
+            }
+
             if (this.waitingText) {
                 this.waitingText.destroy();
                 this.waitingText = null;
@@ -217,6 +234,12 @@ export default class GameScene extends Phaser.Scene {
         otherPlayer.setDepth(DEPTH.HORSE);
         otherPlayer.play('horse_run');
         this.otherPlayers.add(otherPlayer);
+    }
+
+    clearAllUI() {
+        const gameCanvas = this.game.canvas;
+        const domContainer = gameCanvas.parentElement.querySelectorAll('.phaser-dom-element');
+        domContainer.forEach(el => el.remove());
     }
 
     // --- UI & COUNTDOWN ---
@@ -364,6 +387,8 @@ export default class GameScene extends Phaser.Scene {
                 this.role = 'player';
                 dom.destroy();
 
+                window.scrollTo(0, 0);
+
                 this.socket.emit('selectRole', {
                     role: 'player',
                     name
@@ -417,12 +442,16 @@ export default class GameScene extends Phaser.Scene {
 
         this.socket.once('hostAccepted', () => {
             dom.destroy();
+            window.scrollTo(0, 0);
         });
     }
 
     showWinnerBanner(winnerName) {
         const cx = this.cameras.main.centerX;
         const cy = this.cameras.main.centerY;
+
+        this.winnerOverlay = this.add.rectangle(cx, cy, this.cameras.main.width, this.cameras.main.height, 0x000000, 0.6)
+            .setScrollFactor(0).setDepth(DEPTH.UI);
 
         // nền tối
         const overlay = this.add.rectangle(
@@ -456,16 +485,12 @@ export default class GameScene extends Phaser.Scene {
             strokeThickness: 4
         }).setOrigin(0.5);
 
-        const container = this.add.container(cx, cy, [
-            frame, title, nameText
-        ])
-            .setScrollFactor(0)
-            .setDepth(DEPTH.UI)
-            .setScale(0);
+        this.winnerContainer = this.add.container(cx, cy, [frame, title, nameText])
+            .setScrollFactor(0).setDepth(DEPTH.UI).setScale(0);
 
         // animation pixel pop
         this.tweens.add({
-            targets: container,
+            targets: this.winnerContainer,
             scale: 1,
             duration: 200,
             ease: 'Back.Out'
@@ -504,6 +529,8 @@ const PIXEL_INPUT_STYLE = `
     padding: 8px;
     outline: none;
     box-shadow: 0 0 0 3px #003b1f inset;
+    appearance: none;
+    -webkit-appearance: none;
 `;
 
 const PIXEL_BTN_STYLE = `
