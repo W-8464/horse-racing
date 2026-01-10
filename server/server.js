@@ -57,6 +57,8 @@ io.on('connection', (socket) => {
 
         winnerId = null;
 
+        Object.values(players).forEach(p => p.x = 150);
+
         gameState.status = 'COUNTDOWN';
         io.emit('startCountdown');
     });
