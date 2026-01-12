@@ -14,6 +14,7 @@ let gameState = {
 };
 let winnerId = null;
 const FINISH_LINE_X = 2000;
+const COUNTDOWN_TIME = 3;
 
 io.on('connection', (socket) => {
     console.log('Người chơi mới:', socket.id);
@@ -61,10 +62,16 @@ io.on('connection', (socket) => {
 
         gameState.status = 'COUNTDOWN';
         io.emit('startCountdown');
+
+        setTimeout(() => {
+            gameState.status = 'RUNNING';
+        }, (COUNTDOWN_TIME + 1) * 1000);
     });
 
     socket.on('playerMovement', (data) => {
-        if (!players[socket.id]) return;
+        if (socket.role !== 'player') return;                 // ✅ host không được move
+        if (gameState.status !== 'RUNNING') return;           // ✅ chưa start thì ignore
+        if (winnerId) return;                                 // ✅ có winner rồi thì khóa
 
         players[socket.id].x = data.x;
 
@@ -83,6 +90,13 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log('Người chơi thoát:', socket.id);
+
+        if (socket.id === gameState.hostId) {
+            gameState.hostId = null;
+            gameState.status = 'LOBBY';
+            winnerId = null;
+        }
+
         delete players[socket.id];
         io.emit('playerDisconnected', socket.id);
     });

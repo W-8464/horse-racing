@@ -10,6 +10,7 @@ export const config = {
         orientation: Phaser.Scale.Orientation.LANDSCAPE,
         width: 1280,
         height: 720,
+        fullscreenTarget: 'game-container'
     },
     physics: {
         default: 'arcade',
