@@ -7,7 +7,7 @@ const path = require('path');
 app.use(express.static(path.join(__dirname, '../client')));
 
 const players = {};
-const HOST_PASSWORD = 'admin123';
+const HOST_PASSWORD = 'a';
 let gameState = {
     status: 'LOBBY', // LOBBY | COUNTDOWN | RUNNING
     hostId: null

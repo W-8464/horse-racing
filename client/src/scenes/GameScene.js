@@ -87,6 +87,8 @@ export default class GameScene extends Phaser.Scene {
 
     setupInputs() {
         this.input.on('pointerdown', (pointer) => {
+            if (this.winnerContainer || this.winnerOverlay) return;
+
             if (!this.isRaceStarted || this.isFinished || !this.horse || this.role !== 'player') return;
 
             if (this.flashButton && this.flashButton.getBounds().contains(pointer.x, pointer.y)) return;
@@ -205,6 +207,8 @@ export default class GameScene extends Phaser.Scene {
 
     // --- PLAYERS ---
     addPlayer(playerInfo) {
+        if (this.horse) return;
+
         this.horse = new Horse(
             this,
             playerInfo.x,
@@ -221,6 +225,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     addOtherPlayers(playerInfo) {
+        const existing = this.otherPlayers.getChildren().find(p => p.playerId === playerInfo.id);
+        if (existing || playerInfo.id === this.socket.id) {
+            return;
+        }
+
         const otherPlayer = new Horse(
             this,
             playerInfo.x,
@@ -450,64 +459,53 @@ export default class GameScene extends Phaser.Scene {
         const cx = this.cameras.main.centerX;
         const cy = this.cameras.main.centerY;
 
+        // 1. Tạo nền tối (Canvas)
         this.winnerOverlay = this.add.rectangle(cx, cy, this.cameras.main.width, this.cameras.main.height, 0x000000, 0.6)
             .setScrollFactor(0).setDepth(DEPTH.UI);
 
-        // nền tối
-        const overlay = this.add.rectangle(
-            cx, cy,
-            this.cameras.main.width,
-            this.cameras.main.height,
-            0x000000, 0.6
-        ).setScrollFactor(0).setDepth(DEPTH.UI);
+        // 2. Tạo bảng thông báo bằng HTML (DOM) để tách biệt hoàn toàn Input
+        const winnerDom = this.add.dom(cx, cy).createFromHTML(`
+        <div style="
+            background: #003b1f; 
+            border: 4px solid #5dfc9b; 
+            padding: 20px 60px; 
+            text-align: center; 
+            font-family: monospace;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        ">
+            <h1 style="color: #ffeb3b; margin: 0 0 10px 0; font-size: 32px;">WINNER!</h1>
+            <div style="color: #5dfc9b; font-size: 24px; margin-bottom: 20px;">${winnerName}</div>
+            <button id="restartBtn" style="
+                background: #5dfc9b; 
+                color: #003b1f; 
+                border: none; 
+                padding: 10px 30px; 
+                font-family: monospace; 
+                font-weight: bold; 
+                font-size: 20px; 
+                cursor: pointer;
+            ">RESTART</button>
+        </div>
+    `).setDepth(DEPTH.UI + 1).setScrollFactor(0);
 
-        // khung pixel
-        const frame = this.add.graphics()
-            .lineStyle(4, 0x5dfc9b)
-            .fillStyle(0x003b1f, 1)
-            .fillRect(-220, -80, 440, 160)
-            .strokeRect(-220, -80, 440, 160);
-
-        // text WINNER
-        const title = this.add.text(0, -30, 'WINNER!', {
-            fontFamily: 'monospace',
-            fontSize: '36px',
-            color: '#ffeb3b',
-            stroke: '#000000',
-            strokeThickness: 4
-        }).setOrigin(0.5);
-
-        const nameText = this.add.text(0, 25, winnerName, {
-            fontFamily: 'monospace',
-            fontSize: '28px',
-            color: '#5dfc9b',
-            stroke: '#000000',
-            strokeThickness: 4
-        }).setOrigin(0.5);
-
-        this.winnerContainer = this.add.container(cx, cy, [frame, title, nameText])
-            .setScrollFactor(0).setDepth(DEPTH.UI).setScale(0);
-
-        // animation pixel pop
-        this.tweens.add({
-            targets: this.winnerContainer,
-            scale: 1,
-            duration: 200,
-            ease: 'Back.Out'
+        winnerDom.addListener('click');
+        winnerDom.on('click', (e) => {
+            if (e.target.id === 'restartBtn') {
+                window.location.reload();
+            }
         });
 
-        // auto fade sau 3s
-        // this.time.delayedCall(3000, () => {
-        //     this.tweens.add({
-        //         targets: [container, overlay],
-        //         alpha: 0,
-        //         duration: 500,
-        //         onComplete: () => {
-        //             container.destroy();
-        //             overlay.destroy();
-        //         }
-        //     });
-        // });
+        // Gán vào biến để quản lý nếu cần destroy
+        this.winnerContainer = winnerDom;
+
+        // Animation pop nhẹ
+        winnerDom.setScale(0);
+        this.tweens.add({
+            targets: winnerDom,
+            scale: 1,
+            duration: 300,
+            ease: 'Back.Out'
+        });
     }
 
     update() {
