@@ -8,7 +8,7 @@ export const config = {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
         orientation: Phaser.Scale.Orientation.LANDSCAPE,
-        width: 1280,  // Giữ nguyên độ phân giải thiết kế của bạn
+        width: 1280,
         height: 720,
     },
     physics: {
