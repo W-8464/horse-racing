@@ -45,12 +45,9 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
     }
 
     playRun() {
-        this.play(`${this.textureKey}_run`, true);
-
-        if (this.idleTimer) this.idleTimer.remove();
-        // this.idleTimer = this.scene.time.delayedCall(500, () => {
-        //     if (this.active) this.play(`idle_${this.textureKey}`, true);
-        // });
+        const key = `${this.textureKey}_run`;
+        if (this.scene.anims.exists(key)) this.play(key, true);
+        else if (this.scene.anims.exists('horse_run')) this.play('horse_run', true);
     }
 
     resetColor() {

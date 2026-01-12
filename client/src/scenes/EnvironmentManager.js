@@ -6,31 +6,34 @@ export default class EnvironmentManager {
     }
 
     createPixelTextures() {
-        // Cỏ
-        const grassCanvas = this.scene.textures.createCanvas('grassPixel', 64, 64);
-        const ctx = grassCanvas.context;
-        ctx.fillStyle = '#73bd4d';
-        ctx.fillRect(0, 0, 64, 64);
-        const colors = ['#7bc655', '#6ab344', '#5da139', '#82c35e'];
+        // ✅ Guard tránh tạo lại
+        if (!this.scene.textures.exists('grassPixel')) {
+            const grassCanvas = this.scene.textures.createCanvas('grassPixel', 64, 64);
+            const ctx = grassCanvas.context;
+            ctx.fillStyle = '#73bd4d';
+            ctx.fillRect(0, 0, 64, 64);
+            const colors = ['#7bc655', '#6ab344', '#5da139', '#82c35e'];
 
-        for (let i = 0; i < 150; i++) {
-            ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
-            const x = Math.floor(Math.random() * 16) * 4;
-            const y = Math.floor(Math.random() * 16) * 4;
-            const size = Math.random() > 0.5 ? 4 : 8;
-            ctx.fillRect(x, y, size, size);
+            for (let i = 0; i < 150; i++) {
+                ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+                const x = Math.floor(Math.random() * 16) * 4;
+                const y = Math.floor(Math.random() * 16) * 4;
+                const size = Math.random() > 0.5 ? 4 : 8;
+                ctx.fillRect(x, y, size, size);
+            }
+            grassCanvas.refresh();
         }
-        grassCanvas.refresh();
 
-        // Mây
-        const cloudCanvas = this.scene.textures.createCanvas('cloudPixel', 64, 32);
-        const cCtx = cloudCanvas.context;
-        cCtx.fillStyle = '#ffffff';
-        cCtx.fillRect(16, 0, 32, 16);
-        cCtx.fillRect(0, 12, 64, 16);
-        cCtx.fillStyle = '#def2ff';
-        cCtx.fillRect(10, 24, 44, 4);
-        cloudCanvas.refresh();
+        if (!this.scene.textures.exists('cloudPixel')) {
+            const cloudCanvas = this.scene.textures.createCanvas('cloudPixel', 64, 32);
+            const cCtx = cloudCanvas.context;
+            cCtx.fillStyle = '#ffffff';
+            cCtx.fillRect(16, 0, 32, 16);
+            cCtx.fillRect(0, 12, 64, 16);
+            cCtx.fillStyle = '#def2ff';
+            cCtx.fillRect(10, 24, 44, 4);
+            cloudCanvas.refresh();
+        }
     }
 
     setupWorld() {
