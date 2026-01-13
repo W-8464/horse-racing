@@ -16,6 +16,18 @@ let winnerId = null;
 const FINISH_LINE_X = 2000;
 const COUNTDOWN_TIME = 3;
 
+const TICK_RATE = 20;
+
+setInterval(() => {
+    if (Object.keys(players).length > 0) {
+        // Gửi dữ liệu cho TẤT CẢ mọi người cùng lúc
+        io.emit('gameStateUpdate', {
+            players: players,
+            ts: Date.now()
+        });
+    }
+}, 1000 / TICK_RATE);
+
 io.on('connection', (socket) => {
     console.log('Người chơi mới:', socket.id);
 
@@ -69,23 +81,20 @@ io.on('connection', (socket) => {
     });
 
     socket.on('playerMovement', (data) => {
-        if (socket.role !== 'player') return;                 // ✅ host không được move
-        if (gameState.status !== 'RUNNING') return;           // ✅ chưa start thì ignore
-        if (winnerId) return;                                 // ✅ có winner rồi thì khóa
+        if (socket.role !== 'player' || gameState.status !== 'RUNNING' || winnerId) return;
 
-        players[socket.id].x = data.x;
+        if (players[socket.id]) {
+            players[socket.id].x = data.x;
 
-        // 🏁 CHECK WIN
-        if (!winnerId && data.x >= FINISH_LINE_X) {
-            winnerId = socket.id;
-
-            io.emit('raceFinished', {
-                winnerId: socket.id,
-                winnerName: players[socket.id].name
-            });
+            if (!winnerId && data.x >= FINISH_LINE_X) {
+                winnerId = socket.id;
+                io.emit('raceFinished', {
+                    winnerId: socket.id,
+                    winnerName: players[socket.id].name
+                });
+            }
         }
-
-        socket.broadcast.emit('playerMoved', players[socket.id]);
+        // KHÔNG broadcast ở đây nữa để tiết kiệm băng thông
     });
 
     socket.on('disconnect', () => {
