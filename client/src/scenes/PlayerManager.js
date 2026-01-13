@@ -62,12 +62,40 @@ export default class PlayerManager {
         this.otherPlayers.add(other);
     }
 
-    updateOtherPosition(playerInfo) {
-        const other = this.otherPlayers.getChildren().find(p => p.playerId === playerInfo.id);
-        if (!other) return;
+    // updateOtherPosition(playerInfo) {
+    //     const other = this.otherPlayers.getChildren().find(p => p.playerId === playerInfo.id);
+    //     if (!other) return;
 
-        other.setPosition(playerInfo.x, playerInfo.y);
-        if (other.playRun) other.playRun();
+    //     other.setPosition(playerInfo.x, playerInfo.y);
+    //     if (other.playRun) other.playRun();
+    // }
+
+    updateAllPositions(networkManager) {
+        const state = networkManager.getInterpolatedState();
+        if (!state) return;
+
+        const { b0, b1, renderTime } = state;
+
+        // Tính toán tỷ lệ thời gian (0 đến 1)
+        const interpolationFactor = (renderTime - b0.ts) / (b1.ts - b0.ts);
+
+        Object.keys(b1.players).forEach(id => {
+            // Không nội suy chính mình (vì mình di chuyển local)
+            if (id === this.scene.network.socket.id) return;
+
+            const p0 = b0.players[id];
+            const p1 = b1.players[id];
+
+            if (p0 && p1) {
+                const other = this.otherPlayers.getChildren().find(p => p.playerId === id);
+                if (other) {
+                    // Nội suy tuyến tính: x = x0 + (x1 - x0) * factor
+                    const newX = p0.x + (p1.x - p0.x) * interpolationFactor;
+                    other.x = newX;
+                    if (other.playRun) other.playRun();
+                }
+            }
+        });
     }
 
     removeOther(playerId) {

@@ -6,6 +6,8 @@ export default class NetworkManager {
         this.ui = ui;
 
         this.socket = null;
+        this.renderBuffer = [];
+        this.bufferDelay = 100;
     }
 
     init() {
@@ -76,6 +78,31 @@ export default class NetworkManager {
             this.state.isFinished = true;
             this.ui.showWinnerBanner(data.winnerName);
         });
+
+        this.socket.on('gameStateUpdate', (data) => {
+            this.renderBuffer.push(data);
+            if (this.renderBuffer.length > 60) this.renderBuffer.shift();
+        });
+
+        this.socket.off('playerMoved');
+    }
+
+    getInterpolatedState() {
+        const renderTime = Date.now() - this.bufferDelay;
+
+        // Cần ít nhất 2 gói tin để nội suy
+        if (this.renderBuffer.length < 2) return null;
+
+        // Tìm 2 gói tin bao quanh renderTime
+        for (let i = 0; i < this.renderBuffer.length - 1; i++) {
+            const b0 = this.renderBuffer[i];
+            const b1 = this.renderBuffer[i + 1];
+
+            if (renderTime >= b0.ts && renderTime <= b1.ts) {
+                return { b0, b1, renderTime };
+            }
+        }
+        return null;
     }
 
     // emits

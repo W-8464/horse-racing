@@ -100,6 +100,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     update() {
+        if (this.players && this.network) {
+            this.players.updateAllPositions(this.network);
+        }
         this.players?.updateHostCameraFollow();
     }
 }
