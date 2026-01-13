@@ -23,7 +23,11 @@ export const GAME_SETTINGS = {
     FINISH_LINE_X: 2000,
     WORLD_WIDTH: 2500,
 
-    COUNTDOWN_TIME: 3
+    COUNTDOWN_TIME: 3,
+
+    TICK_RATE: 20,
+    INPUT_BATCH_MS: 50,
+    CLICK_STEP_DISTANCE: 10
 };
 
 export const DEPTH = {
