@@ -16,7 +16,7 @@ let winnerId = null;
 const FINISH_LINE_X = 2000;
 const COUNTDOWN_TIME = 3;
 
-const TICK_RATE = 20;
+const TICK_RATE = 10;
 
 setInterval(() => {
     if (Object.keys(players).length > 0) {
@@ -88,9 +88,19 @@ io.on('connection', (socket) => {
 
             if (!winnerId && data.x >= FINISH_LINE_X) {
                 winnerId = socket.id;
+                const top10 = Object.values(players)
+                    .sort((a, b) => b.x - a.x)
+                    .slice(0, 10)
+                    .map((p, index) => ({
+                        rank: index + 1,
+                        name: p.name || 'Unknown',
+                        x: Math.floor(p.x)
+                    }));
+
                 io.emit('raceFinished', {
                     winnerId: socket.id,
-                    winnerName: players[socket.id].name
+                    winnerName: players[socket.id].name,
+                    top10: top10
                 });
             }
         }
