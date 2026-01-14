@@ -67,6 +67,8 @@ export default class GameScene extends Phaser.Scene {
 
         this.setupResizeHandler();
 
+        this.setupRestartHandler();
+
         this.ui.showPlayerNameInput(
             (name) => {
                 this.handleFullScreen();
@@ -96,22 +98,54 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
+    setupRestartHandler() {
+        // chỉ host mới được yêu cầu restart
+        this.events.on('restartRequested', this.handleRestartRequested, this);
+
+        // cleanup
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.events.off('restartRequested', this.handleRestartRequested, this);
+        });
+    }
+
+    handleRestartRequested() {
+        if (this.state.role !== 'host') return;
+
+        // Ưu tiên gọi method nếu NetworkManager có expose
+        if (this.network?.requestRestart) {
+            this.network.requestRestart();
+            return;
+        }
+
+        // fallback: nếu NetworkManager expose socket
+        if (this.network?.socket) {
+            this.network.socket.emit('hostRestartGame');
+            return;
+        }
+
+        console.warn('[restart] Cannot find socket/requestRestart in NetworkManager');
+    }
+
     handleResize(gameSize) {
         const width = gameSize.width;
         const height = gameSize.height;
 
         const cam = this.cameras.main;
+
+        const baseW = GAME_SETTINGS.DESIGN_WIDTH || 1560;
+        const baseH = GAME_SETTINGS.DESIGN_HEIGHT || 720;
+        const rawZoom = Math.min(width / baseW, height / baseH);
+        const zoom = Phaser.Math.Clamp(rawZoom, 0.45, 1);
+
         cam.setViewport(0, 0, width, height);
         cam.setSize(width, height);
-
-        // Bounds cao >= viewport height
+        //cam.setZoom(zoom);
+        //const worldHeight = Math.max(baseH, height / zoom);
         const worldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT || 720, height);
         cam.setBounds(0, 0, GAME_SETTINGS.WORLD_WIDTH, worldHeight);
 
-        // background/checkline kéo dài theo worldHeight
         this.env?.resize(worldHeight);
 
-        // UI re-layout theo scene.scale
         this.ui?.layout();
     }
 

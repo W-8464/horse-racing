@@ -339,6 +339,8 @@ export default class UIManager {
         const { winnerName, top10 } = data; // winnerName giữ lại nếu cần
         const { w, h, cx, cy } = this._getLayout();
 
+        const isHost = this.state.role === 'host';
+
         this.destroyWinner();
 
         this.winnerOverlay = this.scene.add.rectangle(
@@ -361,7 +363,24 @@ export default class UIManager {
             <span>${p.x}m</span>
         </div>
     `).join('');
-
+        const restartHtml = isHost ? `
+        <button id="restartBtn" style="
+          background:#5dfc9b; color:#003b1f; border:none;
+          padding:12px 30px; font-family:monospace; font-weight:bold;
+          font-size:18px; cursor:pointer; width: 100%;
+        ">PLAY AGAIN</button>
+        ` : `
+        <div style="
+          color:#5dfc9b;
+          font-family:monospace;
+          font-size:14px;
+          opacity:0.85;
+          margin-top:10px;
+          text-align:center;
+        ">
+          Waiting for host to restart...
+        </div>
+        `;
         const dom = this.scene.add.dom(cx, cy).createFromHTML(`
       <div style="
         background: #003b1f;
@@ -379,8 +398,16 @@ export default class UIManager {
         <div style="max-height: 350px; overflow-y: auto; margin-bottom: 20px; text-align: left; padding-right: 5px;">
             ${top10Html}
         </div>
+
+        ${restartHtml}
       </div>
     `).setDepth(DEPTH.UI + 1).setScrollFactor(0);
+
+        dom.addListener('click');
+        dom.on('click', (e) => {
+            if (!isHost) return;
+            if (e.target && e.target.id === 'restartBtn') this.scene.events.emit('restartRequested');
+        });
 
         this.winnerContainer = dom;
 

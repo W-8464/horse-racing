@@ -110,6 +110,10 @@ export default class NetworkManager {
             if (this.renderBuffer.length > 60) this.renderBuffer.shift();
         });
 
+        this.socket.on('forceReload', () => {
+            window.location.reload();
+        });
+
         this.socket.off('playerMoved');
     }
 
@@ -146,5 +150,10 @@ export default class NetworkManager {
 
     emitMovement(x) {
         this.socket.emit('playerMovement', { x });
+    }
+
+    requestRestart() {
+        if (this.state.role !== 'host') return;
+        this.socket.emit('hostRestartGame');
     }
 }
