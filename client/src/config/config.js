@@ -5,11 +5,16 @@ export const config = {
         createContainer: true // 🔥 BẮT BUỘC
     },
     scale: {
-        mode: Phaser.Scale.FIT,
+        // RESIZE: canvas sẽ luôn khớp với size của parent (#game-container).
+        // UI sẽ tự layout theo scene.scale.width/height trong từng scene.
+        mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH,
-        orientation: Phaser.Scale.Orientation.LANDSCAPE,
-        width: 1280,
+
+        // Kích thước "thiết kế" (base) để làm chuẩn layout/font.
+        // Khi RESIZE, width/height ở đây chỉ là mặc định lúc init.
+        width: 1560,
         height: 720,
+
         fullscreenTarget: 'game-container'
     },
     physics: {
@@ -19,6 +24,10 @@ export const config = {
 };
 
 export const GAME_SETTINGS = {
+    // Base design size (dùng làm tỉ lệ layout UI)
+    DESIGN_WIDTH: 1560,
+    DESIGN_HEIGHT: 720,
+
     START_LINE_X: 150,
     FINISH_LINE_X: 2000,
     WORLD_WIDTH: 2500,

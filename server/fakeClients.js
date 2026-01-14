@@ -1,8 +1,8 @@
 const { io } = require("socket.io-client");
 
 const URL = "http://103.82.37.188/";
-const MAX_USERS = 20;
-const CLICK_SPEED = 1000;
+const MAX_USERS = 100;
+const CLICK_SPEED = 500;
 const MOVE_STEP = 15;
 
 function createPlayer(index) {
