@@ -41,7 +41,10 @@ export default class GameScene extends Phaser.Scene {
         // environment
         this.env = new EnvironmentManager(this);
         this.env.createPixelTextures();
-        this.env.setupWorld();
+
+        const initialWorldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT || 720, this.scale.height);
+        this.env.setupWorld(initialWorldHeight);
+
         this.env.drawCheckeredLine(GAME_SETTINGS.START_LINE_X);
         this.env.drawCheckeredLine(GAME_SETTINGS.FINISH_LINE_X);
 
@@ -62,24 +65,54 @@ export default class GameScene extends Phaser.Scene {
         this.inputs = new InputManager(this, this.state, this.players, this.network, this.flashSkill, this.ui);
         this.inputs.init();
 
-        // UI flow: chọn mode
-        this.ui.showModeSelection({
-            onPlayer: () => {
+        this.setupResizeHandler();
+
+        this.ui.showPlayerNameInput(
+            (name) => {
                 this.handleFullScreen();
-                this.ui.showPlayerNameInput((name) => {
-                    this.state.role = 'player';
-                    this.network.selectRolePlayer(name);
-                    this.ui.showWaitingText();
-                });
+                this.state.role = 'player';
+                this.network.selectRolePlayer(name);
+                this.ui.showWaitingText();
             },
-            onHost: () => {
+            () => {
                 this.handleFullScreen();
                 this.ui.showHostPasswordInput((password) => {
                     this.state.role = 'host';
                     this.network.selectRoleHost(password);
                 });
             }
+        );
+    }
+
+    setupResizeHandler() {
+        // layout ngay lúc init
+        this.handleResize({ width: this.scale.width, height: this.scale.height });
+
+        this.scale.on('resize', this.handleResize, this);
+
+        // cleanup
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.scale.off('resize', this.handleResize, this);
         });
+    }
+
+    handleResize(gameSize) {
+        const width = gameSize.width;
+        const height = gameSize.height;
+
+        const cam = this.cameras.main;
+        cam.setViewport(0, 0, width, height);
+        cam.setSize(width, height);
+
+        // Bounds cao >= viewport height
+        const worldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT || 720, height);
+        cam.setBounds(0, 0, GAME_SETTINGS.WORLD_WIDTH, worldHeight);
+
+        // background/checkline kéo dài theo worldHeight
+        this.env?.resize(worldHeight);
+
+        // UI re-layout theo scene.scale
+        this.ui?.layout();
     }
 
     createAnimations() {
