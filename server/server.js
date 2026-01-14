@@ -123,6 +123,20 @@ io.on('connection', (socket) => {
         io.emit('playerDisconnected', socket.id);
     });
 
+    // Host bấm "PLAY AGAIN" -> ép tất cả client reload trang
+    socket.on('hostRestartGame', () => {
+        if (socket.id !== gameState.hostId) return;
+
+        winnerId = null;
+        gameState.status = 'LOBBY';
+
+        // reset vị trí (phòng trường hợp có ai không reload kịp)
+        Object.values(players).forEach(p => p.x = 150);
+
+        io.emit('forceReload');
+    });
+
+
     socket.on('resetRace', () => {
         winnerId = null;
         gameState.status = 'LOBBY';
