@@ -280,39 +280,65 @@ export default class UIManager {
         }
     }
 
-    showWinnerBanner(winnerName) {
+    showWinnerBanner(data) {
+        const { winnerName, top10 } = data; // Nhận dữ liệu từ server
         const cx = this.scene.cameras.main.centerX;
         const cy = this.scene.cameras.main.centerY;
 
         this.destroyWinner();
 
+        // Tạo lớp phủ nền tối
         this.winnerOverlay = this.scene.add.rectangle(
             cx, cy,
             this.scene.cameras.main.width,
             this.scene.cameras.main.height,
-            0x000000,
-            0.6
+            0x000000, 0.8
         ).setScrollFactor(0).setDepth(DEPTH.UI);
 
+        // Tạo nội dung danh sách Top 10
+        const top10Html = top10.map(p => `
+        <div style="
+            display: flex; 
+            justify-content: space-between; 
+            border-bottom: 1px solid #2e7d32; 
+            padding: 8px 0; 
+            font-size: 16px;
+            color: ${p.rank === 1 ? '#ffeb3b' : '#5dfc9b'};
+            ${p.rank === 1 ? 'font-weight: bold; text-shadow: 0 0 5px #ffeb3b;' : ''}
+        ">
+            <span>#${p.rank} ${p.name.toUpperCase()}</span>
+            <span>${p.x}m</span>
+        </div>
+    `).join('');
+
+        // Hiển thị Popup kết quả
         const dom = this.scene.add.dom(cx, cy).createFromHTML(`
       <div style="
         background: #003b1f;
         border: 4px solid #5dfc9b;
-        padding: 20px 60px;
+        padding: 20px 30px;
         text-align: center;
-        font-family: monospace;
-        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        font-family: 'Courier New', monospace;
+        min-width: 320px;
+        box-shadow: 0 0 30px rgba(0,0,0,0.8);
       ">
-        <h1 style="color:#ffeb3b;margin:0 0 10px 0;font-size:32px;">WINNER!</h1>
-        <div style="color:#5dfc9b;font-size:24px;margin-bottom:20px;">${winnerName}</div>
+        <h1 style="color:#ffeb3b; margin:0 0 15px 0; font-size:24px; border-bottom: 2px solid #ffeb3b;">
+            LEADERBOARD
+        </h1>
+        
+        <div style="max-height: 350px; overflow-y: auto; margin-bottom: 20px; text-align: left; padding-right: 5px;">
+            ${top10Html}
+        </div>
+
         <button id="restartBtn" style="
-          background:#5dfc9b;color:#003b1f;border:none;
-          padding:10px 30px;font-family:monospace;font-weight:bold;
-          font-size:20px;cursor:pointer;
-        ">RESTART</button>
+          background:#5dfc9b; color:#003b1f; border:none;
+          padding:12px 30px; font-family:monospace; font-weight:bold;
+          font-size:18px; cursor:pointer; width: 100%;
+        ">PLAY AGAIN</button>
       </div>
     `).setDepth(DEPTH.UI + 1).setScrollFactor(0);
 
+        // Lắng nghe sự kiện click nút chơi lại
         dom.addListener('click');
         dom.on('click', (e) => {
             if (e.target.id === 'restartBtn') window.location.reload();
@@ -320,11 +346,12 @@ export default class UIManager {
 
         this.winnerContainer = dom;
 
+        // Hiệu ứng hiện ra (Pop-in)
         dom.setScale(0);
         this.scene.tweens.add({
             targets: dom,
             scale: 1,
-            duration: 300,
+            duration: 400,
             ease: 'Back.Out'
         });
     }

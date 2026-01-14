@@ -76,7 +76,7 @@ export default class NetworkManager {
         this.socket.on('raceFinished', (data) => {
             this.state.isRaceStarted = false;
             this.state.isFinished = true;
-            this.ui.showWinnerBanner(data.winnerName);
+            this.ui.showWinnerBanner(data);
         });
 
         this.socket.on('gameStateUpdate', (data) => {
