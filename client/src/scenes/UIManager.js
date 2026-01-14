@@ -3,24 +3,30 @@ import { GAME_SETTINGS, DEPTH } from '../config/config.js';
 const PIXEL_INPUT_STYLE = `
   background: #111;
   color: #5dfc9b;
-  border: 3px solid #5dfc9b;
+  border: 4px solid #5dfc9b;
   font-family: monospace;
-  font-size: 18px;
-  padding: 8px;
+  font-size: 24px;
+  padding: 12px;
   outline: none;
-  box-shadow: 0 0 0 3px #003b1f inset;
+  box-shadow: 0 0 0 4px #003b1f inset;
   appearance: none;
   -webkit-appearance: none;
+  width: 300px;
+  text-align: center;
 `;
 
 const PIXEL_BTN_STYLE = `
   background: #003b1f;
   color: #5dfc9b;
-  border: 3px solid #5dfc9b;
+  border: 4px solid #5dfc9b;
   font-family: monospace;
-  font-size: 18px;
-  padding: 8px 20px;
+  font-size: 22px;
+  padding: 12px 25px;
   cursor: pointer;
+  min-width: 140px;
+  margin: 10px;
+  font-weight: bold;
+  transition: all 0.1s;
 `;
 
 export default class UIManager {
@@ -41,48 +47,81 @@ export default class UIManager {
 
         this.winnerOverlay = null;
         this.winnerContainer = null;
+
+        // tỉ lệ y theo thiết kế 720px
+        this._ratioInputY = 300 / (GAME_SETTINGS.DESIGN_HEIGHT || 720);
+        this._ratioCountdownY = 200 / (GAME_SETTINGS.DESIGN_HEIGHT || 720);
+    }
+
+    _getLayout() {
+        const w = this.scene.scale.width;
+        const h = this.scene.scale.height;
+        const cx = w / 2;
+        const cy = h / 2;
+
+        const baseW = GAME_SETTINGS.DESIGN_WIDTH || 1560;
+        const baseH = GAME_SETTINGS.DESIGN_HEIGHT || 720;
+
+        // scale UI nhẹ theo viewport (để màn nhỏ không bị tràn)
+        const s = Phaser.Math.Clamp(Math.min(w / baseW, h / baseH), 0.65, 1.2);
+
+        return { w, h, cx, cy, s };
+    }
+
+    layout() {
+        const { w, h, cx, cy, s } = this._getLayout();
+        const inputY = Math.round(h * this._ratioInputY);
+        const countdownY = Math.round(h * this._ratioCountdownY);
+
+        if (this.playerNameDom) {
+            this.playerNameDom.setPosition(cx, inputY);
+            this.playerNameDom.setScale(s);
+        }
+        if (this.hostPassDom) {
+            this.hostPassDom.setPosition(cx, inputY);
+            this.hostPassDom.setScale(s);
+        }
+
+        if (this.waitingText) {
+            this.waitingText.setPosition(cx, inputY);
+            this.waitingText.setFontSize(Math.round(28 * s));
+        }
+        if (this.startButton) {
+            this.startButton.setPosition(cx, inputY);
+            // Không scale container để tránh lệch hit-area.
+        }
+        if (this.countdownText) {
+            this.countdownText.setPosition(cx, countdownY);
+            this.countdownText.setFontSize(Math.round(96 * s));
+        }
+
+        if (this.winnerOverlay) {
+            this.winnerOverlay.setPosition(cx, cy);
+            this.winnerOverlay.setSize(w, h);
+        }
+        if (this.winnerContainer) {
+            this.winnerContainer.setPosition(cx, cy);
+        }
     }
 
     isWinnerOpen() {
         return !!(this.winnerOverlay || this.winnerContainer);
     }
 
-    showModeSelection({ onPlayer, onHost }) {
-        const cx = this.scene.cameras.main.centerX;
-
-        this.playerBtn = this.scene.add.text(cx, 260, 'PLAYER', { fontSize: '32px' })
-            .setOrigin(0.5).setDepth(DEPTH.UI).setInteractive();
-
-        this.hostBtn = this.scene.add.text(cx, 320, 'HOST', { fontSize: '32px' })
-            .setOrigin(0.5).setDepth(DEPTH.UI).setInteractive();
-
-        this.playerBtn.on('pointerdown', () => {
-            this.destroyModeSelection();
-            onPlayer?.();
-        });
-
-        this.hostBtn.on('pointerdown', () => {
-            this.destroyModeSelection();
-            onHost?.();
-        });
-    }
-
-    destroyModeSelection() {
-        if (this.playerBtn) { this.playerBtn.destroy(); this.playerBtn = null; }
-        if (this.hostBtn) { this.hostBtn.destroy(); this.hostBtn = null; }
-    }
-
-    showPlayerNameInput(onJoin) {
-        const cx = this.scene.cameras.main.centerX;
+    showPlayerNameInput(onJoin, onHostClick) {
+        const { cx } = this._getLayout();
 
         const dom = this.scene.add.dom(cx, 300).createFromHTML(`
       <div style="text-align:center">
-        <div style="color:#5dfc9b;font-family:monospace;font-size:20px;margin-bottom:10px">
+        <div style="color:#5dfc9b;font-family:monospace;font-size:32px;margin-bottom:10px">
           ENTER NAME
         </div>
         <input id="playerName" type="text" style="${PIXEL_INPUT_STYLE}" />
         <br/><br/>
-        <button id="joinBtn" style="${PIXEL_BTN_STYLE}">JOIN</button>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button id="joinBtn" style="${PIXEL_BTN_STYLE}">JOIN</button>
+            <button id="hostBtn" style="${PIXEL_BTN_STYLE}; background: #444;">HOST</button>
+        </div>
       </div>
     `).setDepth(DEPTH.UI).setScrollFactor(0);
 
@@ -90,15 +129,21 @@ export default class UIManager {
 
         dom.addListener('click');
         dom.on('click', (e) => {
-            if (e.target.id !== 'joinBtn') return;
+            if (e.target.id === 'joinBtn') {
+                const name = dom.getChildByID('playerName').value.trim();
+                if (!name) return;
+                this.destroyPlayerNameInput();
+                window.scrollTo(0, 0);
+                onJoin?.(name);
+            }
 
-            const name = dom.getChildByID('playerName').value.trim();
-            if (!name) return;
-
-            this.destroyPlayerNameInput();
-            window.scrollTo(0, 0);
-            onJoin?.(name);
+            if (e.target.id === 'hostBtn') {
+                this.destroyPlayerNameInput();
+                onHostClick?.();
+            }
         });
+
+        this.layout();
     }
 
     destroyPlayerNameInput() {
@@ -109,7 +154,7 @@ export default class UIManager {
     }
 
     showHostPasswordInput(onConfirm) {
-        const cx = this.scene.cameras.main.centerX;
+        const { cx } = this._getLayout();
 
         const dom = this.scene.add.dom(cx, 300).createFromHTML(`
       <div style="text-align:center">
@@ -137,6 +182,8 @@ export default class UIManager {
 
             onConfirm?.(pass);
         });
+
+        this.layout();
     }
 
     showHostPasswordError() {
@@ -155,12 +202,16 @@ export default class UIManager {
     showWaitingText() {
         if (this.waitingText) return;
 
+        const { cx } = this._getLayout();
+
         this.waitingText = this.scene.add.text(
-            this.scene.cameras.main.centerX,
+            cx,
             300,
             'Waiting to start...',
             { fontSize: '28px', fontFamily: 'monospace', color: '#ffffff' }
         ).setOrigin(0.5).setDepth(DEPTH.UI);
+
+        this.layout();
     }
 
     destroyWaitingText() {
@@ -173,7 +224,7 @@ export default class UIManager {
     showStartButton(onStart) {
         if (this.startButton) return;
 
-        const { centerX } = this.scene.cameras.main;
+        const { cx } = this._getLayout();
 
         const btnBg = this.scene.add.graphics()
             .fillStyle(0x00c853, 1).lineStyle(4, 0x008a39, 1)
@@ -189,13 +240,15 @@ export default class UIManager {
             color: '#ffffff'
         }).setOrigin(0.5);
 
-        this.startButton = this.scene.add.container(centerX, 300, [btnBg, btnText])
+        this.startButton = this.scene.add.container(cx, 300, [btnBg, btnText])
             .setScrollFactor(0)
             .setSize(200, 80)
             .setInteractive({ useHandCursor: true })
             .setDepth(DEPTH.UI);
 
         this.startButton.on('pointerdown', () => onStart?.());
+
+        this.layout();
     }
 
     destroyStartButton() {
@@ -214,10 +267,8 @@ export default class UIManager {
     }
 
     clearBeforeCountdown() {
-        // dọn sạch UI “trước khi đếm ngược”
         this.clearAllDomElements();
 
-        this.destroyModeSelection();
         this.destroyPlayerNameInput();
         this.destroyHostPasswordInput();
         this.destroyWaitingText();
@@ -235,14 +286,18 @@ export default class UIManager {
             this.countdownText = null;
         }
 
+        const { cx } = this._getLayout();
+
         const txt = this.scene.add.text(
-            this.scene.cameras.main.centerX,
+            cx,
             200,
             timeLeft.toString(),
             { fontSize: '96px', fontStyle: 'bold', color: '#ff1744' }
         ).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH.UI);
 
         this.countdownText = txt;
+
+        this.layout();
 
         this.scene.time.addEvent({
             delay: 1000,
@@ -281,21 +336,17 @@ export default class UIManager {
     }
 
     showWinnerBanner(data) {
-        const { winnerName, top10 } = data; // Nhận dữ liệu từ server
-        const cx = this.scene.cameras.main.centerX;
-        const cy = this.scene.cameras.main.centerY;
+        const { winnerName, top10 } = data; // winnerName giữ lại nếu cần
+        const { w, h, cx, cy } = this._getLayout();
 
         this.destroyWinner();
 
-        // Tạo lớp phủ nền tối
         this.winnerOverlay = this.scene.add.rectangle(
             cx, cy,
-            this.scene.cameras.main.width,
-            this.scene.cameras.main.height,
+            w, h,
             0x000000, 0.8
         ).setScrollFactor(0).setDepth(DEPTH.UI);
 
-        // Tạo nội dung danh sách Top 10
         const top10Html = top10.map(p => `
         <div style="
             display: flex; 
@@ -306,12 +357,11 @@ export default class UIManager {
             color: ${p.rank === 1 ? '#ffeb3b' : '#5dfc9b'};
             ${p.rank === 1 ? 'font-weight: bold; text-shadow: 0 0 5px #ffeb3b;' : ''}
         ">
-            <span>#${p.rank} ${p.name.toUpperCase()}</span>
+            <span>#${p.rank} ${p.name}</span>
             <span>${p.x}m</span>
         </div>
     `).join('');
 
-        // Hiển thị Popup kết quả
         const dom = this.scene.add.dom(cx, cy).createFromHTML(`
       <div style="
         background: #003b1f;
@@ -329,24 +379,11 @@ export default class UIManager {
         <div style="max-height: 350px; overflow-y: auto; margin-bottom: 20px; text-align: left; padding-right: 5px;">
             ${top10Html}
         </div>
-
-        <button id="restartBtn" style="
-          background:#5dfc9b; color:#003b1f; border:none;
-          padding:12px 30px; font-family:monospace; font-weight:bold;
-          font-size:18px; cursor:pointer; width: 100%;
-        ">PLAY AGAIN</button>
       </div>
     `).setDepth(DEPTH.UI + 1).setScrollFactor(0);
 
-        // Lắng nghe sự kiện click nút chơi lại
-        dom.addListener('click');
-        dom.on('click', (e) => {
-            if (e.target.id === 'restartBtn') window.location.reload();
-        });
-
         this.winnerContainer = dom;
 
-        // Hiệu ứng hiện ra (Pop-in)
         dom.setScale(0);
         this.scene.tweens.add({
             targets: dom,
@@ -354,5 +391,7 @@ export default class UIManager {
             duration: 400,
             ease: 'Back.Out'
         });
+
+        this.layout();
     }
 }

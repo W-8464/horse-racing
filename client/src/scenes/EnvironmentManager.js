@@ -3,6 +3,28 @@ import { DEPTH, GAME_SETTINGS } from '../config/config.js';
 export default class EnvironmentManager {
     constructor(scene) {
         this.scene = scene;
+
+        this.worldWidth = GAME_SETTINGS.WORLD_WIDTH;
+
+        // Giữ logic/physics cũ ổn định theo baseHeight
+        this.baseHeight = GAME_SETTINGS.DESIGN_HEIGHT || 720;
+
+        // Giữ skyHeight cố định (tránh phá layout/physics cũ)
+        this.skyHeight = 180;
+
+        // WorldHeight có thể nở theo viewport height (RESIZE)
+        this.worldHeight = this.baseHeight;
+
+        // refs để resize/update
+        this.grass = null;
+        this.sky = null;
+        this.mist = null;
+
+        this._cloudsCreated = false;
+        this._lanternsCreated = false;
+
+        this._checkLineXs = [];
+        this._checkLineGraphics = [];
     }
 
     createPixelTextures() {
@@ -36,42 +58,83 @@ export default class EnvironmentManager {
         }
     }
 
-    setupWorld() {
-        const worldWidth = GAME_SETTINGS.WORLD_WIDTH;
-        const skyHeight = 180;
-        const groundHeight = 540;
+    setupWorld(initialWorldHeight) {
+        const worldHeight = Math.max(this.baseHeight, initialWorldHeight || this.baseHeight);
+        this.worldHeight = worldHeight;
 
-        this.scene.cameras.main.setBounds(0, 0, worldWidth, 720);
-        this.scene.physics.world.setBounds(0, skyHeight, worldWidth, groundHeight);
+        this.scene.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
+        this.scene.physics.world.setBounds(0, this.skyHeight, this.worldWidth, this.worldHeight - this.skyHeight);
 
-        // Trời
-        const sky = this.scene.add.graphics();
-        sky.fillGradientStyle(0x87CEEB, 0x87CEEB, 0xbfe9ff, 0xbfe9ff, 1);
-        sky.fillRect(0, 0, worldWidth, skyHeight);
-
-        // Mây
-        for (let i = 0; i < worldWidth; i += 400) {
-            this.scene.add.image(i, 40 + Math.random() * 60, 'cloudPixel')
-                .setScale(2 + Math.random())
-                .setAlpha(0.5)
-                .setScrollFactor(0.2);
+        // Trời (vẽ 1 lần)
+        if (!this.sky) {
+            const sky = this.scene.add.graphics();
+            sky.fillGradientStyle(0x87CEEB, 0x87CEEB, 0xbfe9ff, 0xbfe9ff, 1);
+            sky.fillRect(0, 0, this.worldWidth, this.skyHeight);
+            this.sky = sky;
         }
 
-        // Cỏ
-        this.scene.add.tileSprite(0, skyHeight, worldWidth, groundHeight, 'grassPixel')
-            .setOrigin(0)
-            .setDepth(DEPTH.GRASS);
-
-        // Đèn lồng
-        for (let x = 0; x < worldWidth; x += 500) {
-            this.scene.add.image(x, -20, 'lantern')
-                .setOrigin(0.5, 0)
-                .setScale(0.5)
-                .setDepth(DEPTH.LANTERN);
+        // Mây (tạo 1 lần)
+        if (!this._cloudsCreated) {
+            for (let i = 0; i < this.worldWidth; i += 400) {
+                this.scene.add.image(i, 40 + Math.random() * 60, 'cloudPixel')
+                    .setScale(2 + Math.random())
+                    .setAlpha(0.5)
+                    .setScrollFactor(0.2);
+            }
+            this._cloudsCreated = true;
         }
 
-        this.drawMountains(worldWidth, skyHeight);
-        this.drawHorizonMist(worldWidth);
+        // Cỏ (update được chiều cao khi resize)
+        if (!this.grass) {
+            this.grass = this.scene.add.tileSprite(
+                0,
+                this.skyHeight,
+                this.worldWidth,
+                this.worldHeight - this.skyHeight,
+                'grassPixel'
+            )
+                .setOrigin(0)
+                .setDepth(DEPTH.GRASS);
+        } else {
+            this._resizeGrass();
+        }
+
+        // Đèn lồng (tạo 1 lần)
+        if (!this._lanternsCreated) {
+            for (let x = 0; x < this.worldWidth; x += 500) {
+                this.scene.add.image(x, -20, 'lantern')
+                    .setOrigin(0.5, 0)
+                    .setScale(0.5)
+                    .setDepth(DEPTH.LANTERN);
+            }
+            this._lanternsCreated = true;
+        }
+
+        // Núi + sương (tạo 1 lần)
+        if (!this.mist) {
+            this.drawMountains(this.worldWidth, this.skyHeight);
+            this.mist = this.drawHorizonMist(this.worldWidth);
+        }
+    }
+
+    resize(nextWorldHeight) {
+        const newHeight = Math.max(this.baseHeight, nextWorldHeight || this.baseHeight);
+        if (newHeight === this.worldHeight) return;
+
+        this.worldHeight = newHeight;
+
+        this.scene.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
+        this.scene.physics.world.setBounds(0, this.skyHeight, this.worldWidth, this.worldHeight - this.skyHeight);
+
+        this._resizeGrass();
+        this._redrawCheckLines();
+    }
+
+    _resizeGrass() {
+        if (!this.grass) return;
+        const h = this.worldHeight - this.skyHeight;
+        this.grass.setSize(this.worldWidth, h);
+        this.grass.setDisplaySize(this.worldWidth, h);
     }
 
     drawMountains(worldWidth, mountainBaseY) {
@@ -104,21 +167,38 @@ export default class EnvironmentManager {
     }
 
     drawCheckeredLine(xPosition) {
-        const skyHeight = 180;
+        this._checkLineXs.push(xPosition);
+
+        const g = this._createCheckeredLineGraphics(xPosition);
+        this._checkLineGraphics.push(g);
+        return g;
+    }
+
+    _createCheckeredLineGraphics(xPosition) {
         const tileSize = 40;
         const cols = 2;
         const graphics = this.scene.add.graphics();
 
         graphics.fillStyle(0x000000, 0.2);
-        graphics.fillRect(xPosition + (cols * tileSize), skyHeight, 10, 720 - skyHeight);
+        graphics.fillRect(xPosition + (cols * tileSize), this.skyHeight, 10, this.worldHeight - this.skyHeight);
 
-        for (let y = skyHeight; y < 720; y += tileSize) {
+        for (let y = this.skyHeight; y < this.worldHeight; y += tileSize) {
             for (let x = 0; x < cols; x++) {
-                const isWhite = ((x + Math.floor((y - skyHeight) / tileSize))) % 2 === 0;
+                const isWhite = ((x + Math.floor((y - this.skyHeight) / tileSize))) % 2 === 0;
                 graphics.fillStyle(isWhite ? 0xffffff : 0x333333, 1);
                 graphics.fillRect(xPosition + (x * tileSize), y, tileSize, tileSize);
             }
         }
+
         graphics.setDepth(DEPTH.CHECK_LINE);
+        return graphics;
+    }
+
+    _redrawCheckLines() {
+        this._checkLineGraphics.forEach(g => g.destroy());
+        this._checkLineGraphics = [];
+        this._checkLineXs.forEach(x => {
+            this._checkLineGraphics.push(this._createCheckeredLineGraphics(x));
+        });
     }
 }
