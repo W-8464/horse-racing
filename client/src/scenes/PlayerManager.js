@@ -75,13 +75,14 @@ export default class PlayerManager {
         if (!state) return;
 
         const { b0, b1, renderTime } = state;
+        const total = b1.ts - b0.ts;
+        if (total <= 0) return;
 
-        // Tính toán tỷ lệ thời gian (0 đến 1)
-        const interpolationFactor = (renderTime - b0.ts) / (b1.ts - b0.ts);
+        const interpolationFactor = (renderTime - b0.ts) / total;
 
         Object.keys(b1.players).forEach(id => {
             // Không nội suy chính mình (vì mình di chuyển local)
-            if (id === this.scene.network.socket.id) return;
+            if (this.state.role === 'player' && id === this.scene.network.socket.id) return;
 
             const p0 = b0.players[id];
             const p1 = b1.players[id];
@@ -91,8 +92,10 @@ export default class PlayerManager {
                 if (other) {
                     // Nội suy tuyến tính: x = x0 + (x1 - x0) * factor
                     const newX = p0.x + (p1.x - p0.x) * interpolationFactor;
-                    other.x = newX;
-                    if (other.playRun) other.playRun();
+                    if (Math.abs(other.x - newX) > 0.5) {
+                        other.x = newX;
+                        if (other.playRun) other.playRun();
+                    }
                 }
             }
         });
