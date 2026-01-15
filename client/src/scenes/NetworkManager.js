@@ -99,10 +99,16 @@ export default class NetworkManager {
             this.ui.startCountdown();
         });
 
+        this.socket.on('youFinished', (data) => {
+            this.ui.showLocalFinishRank(data.rank);
+        });
+
         this.socket.on('raceFinished', (data) => {
             this.state.isRaceStarted = false;
             this.state.isFinished = true;
-            this.ui.showWinnerBanner(data);
+            if (this.state.role === 'host') {
+                this.ui.showWinnerBanner(data);
+            }
         });
 
         this.socket.on('gameStateUpdate', (data) => {
