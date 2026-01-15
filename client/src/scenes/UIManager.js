@@ -44,6 +44,7 @@ export default class UIManager {
         this.hostPassDom = null;
 
         this.countdownText = null;
+        this.finishRankText = null;
 
         this.winnerOverlay = null;
         this.winnerContainer = null;
@@ -325,6 +326,10 @@ export default class UIManager {
     }
 
     destroyWinner() {
+        if (this.finishRankText) {
+            this.finishRankText.destroy();
+            this.finishRankText = null;
+        }
         if (this.winnerContainer) {
             this.winnerContainer.destroy();
             this.winnerContainer = null;
@@ -335,8 +340,25 @@ export default class UIManager {
         }
     }
 
+    showLocalFinishRank(rank) {
+        const { cx, cy } = this._getLayout();
+
+        if (this.finishRankText) this.finishRankText.destroy();
+
+        this.finishRankText = this.scene.add.text(
+            cx, cy - 100,
+            `BẠN ĐÃ VỀ ĐÍCH!\nHẠNG: ${rank}`,
+            {
+                fontSize: '32px',
+                fontFamily: 'monospace',
+                color: '#003b1f',
+                align: 'center',
+            }
+        ).setOrigin(0.5).setDepth(DEPTH.UI).setScrollFactor(0);
+    }
+
     showWinnerBanner(data) {
-        const { winnerName, top10 } = data; // winnerName giữ lại nếu cần
+        const { top10 } = data;
         const { w, h, cx, cy } = this._getLayout();
 
         const isHost = this.state.role === 'host';
@@ -360,7 +382,7 @@ export default class UIManager {
             ${p.rank === 1 ? 'font-weight: bold; text-shadow: 0 0 5px #ffeb3b;' : ''}
         ">
             <span>#${p.rank} ${p.name}</span>
-            <span>${p.x}m</span>
+            <span>${p.finishTime}s</span>
         </div>
     `).join('');
         const restartHtml = isHost ? `

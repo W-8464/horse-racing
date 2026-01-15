@@ -16,3 +16,6 @@ Thumbs.db
 # Thư mục của các trình soạn thảo code
 .vscode/
 .idea/
+
+# Ghi chú
+note.txt

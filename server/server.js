@@ -16,6 +16,8 @@ let gameState = {
     hostId: null
 };
 let winnerId = null;
+let startTime = 0;
+let finishedPlayers = [];
 const FINISH_LINE_X = 2000;
 const COUNTDOWN_TIME = 3;
 
@@ -72,6 +74,7 @@ io.on('connection', (socket) => {
         if (socket.id !== gameState.hostId) return;
 
         winnerId = null;
+        finishedPlayers = [];
 
         Object.values(players).forEach(p => p.x = 150);
 
@@ -80,34 +83,49 @@ io.on('connection', (socket) => {
 
         setTimeout(() => {
             gameState.status = 'RUNNING';
+            startTime = Date.now();
         }, (COUNTDOWN_TIME + 1) * 1000);
     });
 
     socket.on('playerMovement', (data) => {
-        if (socket.role !== 'player' || gameState.status !== 'RUNNING' || winnerId) return;
+        if (socket.role !== 'player' || gameState.status !== 'RUNNING') return;
 
-        if (players[socket.id]) {
-            players[socket.id].x = data.x;
+        const player = players[socket.id];
+        if (!player) return;
 
-            if (!winnerId && data.x >= FINISH_LINE_X) {
-                winnerId = socket.id;
-                const top10 = Object.values(players)
-                    .sort((a, b) => b.x - a.x)
-                    .slice(0, 10)
-                    .map((p, index) => ({
-                        rank: index + 1,
-                        name: p.name || 'Unknown',
-                        x: Math.floor(p.x)
-                    }));
+        // Nếu người chơi đã có trong danh sách về đích, không cho di chuyển tiếp (tùy chọn)
+        const alreadyFinished = finishedPlayers.find(p => p.id === socket.id);
+        if (alreadyFinished) return;
+
+        player.x = data.x;
+
+        if (data.x >= FINISH_LINE_X) {
+            const finishTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            finishedPlayers.push({
+                id: socket.id,
+                name: player.name,
+                finishTime: finishTime
+            });
+
+            // Gửi thông báo riêng cho người vừa về đích (để client dừng input/hiện hiệu ứng)
+            socket.emit('youFinished', { rank: finishedPlayers.length });
+
+            const totalPlayers = Object.keys(players).length;
+            const limit = Math.min(10, totalPlayers);
+
+            if (finishedPlayers.length >= limit) {
+                gameState.status = 'FINISHED';
+                const top10 = finishedPlayers.map((p, index) => ({
+                    rank: index + 1,
+                    name: p.name,
+                    finishTime: p.finishTime
+                }));
 
                 io.emit('raceFinished', {
-                    winnerId: socket.id,
-                    winnerName: players[socket.id].name,
                     top10: top10
                 });
             }
         }
-        // KHÔNG broadcast ở đây nữa để tiết kiệm băng thông
     });
 
     socket.on('disconnect', () => {
@@ -116,7 +134,7 @@ io.on('connection', (socket) => {
         if (socket.id === gameState.hostId) {
             gameState.hostId = null;
             gameState.status = 'LOBBY';
-            winnerId = null;
+            finishedPlayers = [];
         }
 
         delete players[socket.id];
@@ -127,7 +145,7 @@ io.on('connection', (socket) => {
     socket.on('hostRestartGame', () => {
         if (socket.id !== gameState.hostId) return;
 
-        winnerId = null;
+        finishedPlayers = [];
         gameState.status = 'LOBBY';
 
         // reset vị trí (phòng trường hợp có ai không reload kịp)
@@ -138,7 +156,7 @@ io.on('connection', (socket) => {
 
 
     socket.on('resetRace', () => {
-        winnerId = null;
+        finishedPlayers = [];
         gameState.status = 'LOBBY';
         Object.values(players).forEach(p => p.x = 150);
         io.emit('raceReset', players);
