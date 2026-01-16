@@ -113,7 +113,7 @@ export default class NetworkManager {
 
         this.socket.on('gameStateUpdate', (data) => {
             this.renderBuffer.push(data);
-            if (this.renderBuffer.length > 30) this.renderBuffer.shift();
+            if (this.renderBuffer.length > 60) this.renderBuffer.shift();
         });
 
         this.socket.on('forceReload', () => {
