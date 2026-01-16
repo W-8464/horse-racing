@@ -2,13 +2,13 @@ const { io } = require("socket.io-client");
 
 const URL = "http://103.82.37.188/";
 const MAX_USERS = 100;
-const CLICK_SPEED = 100;
-const MOVE_STEP = 5;
+const CLICK_SPEED = 500;
+const MOVE_STEP = 15;
 
 function createPlayer(index) {
-    const socket = io(URL, { transports: ['websocket'], upgrade: false });
+    const socket = io(URL, { transports: ['websocket'] });
 
-    let currentX = 100; // Vị trí bắt đầu trong code server của bạn
+    let currentX = 150; // Vị trí bắt đầu trong code server của bạn
     let isRunning = false;
 
     socket.on("connect", () => {
@@ -32,13 +32,15 @@ function createPlayer(index) {
     // Vòng lặp giả lập hành động click di chuyển
     setInterval(() => {
         if (isRunning) {
-            // Thêm một chút ngẫu nhiên để các bot không chạy khít nhau
-            currentX += (Math.random() * MOVE_STEP); 
+            currentX += MOVE_STEP;
 
+            // Gửi dữ liệu di chuyển giống như client thật
             socket.emit("playerMovement", { x: currentX });
 
-            if (currentX >= 5000) { // Khớp với FINISH_LINE_X trong config.js
+            // Nếu đã về đích (FINISH_LINE_X = 2000)
+            if (currentX >= 2000) {
                 isRunning = false;
+                console.log(`Bot ${index} đã về đích!`);
             }
         }
     }, CLICK_SPEED);

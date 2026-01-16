@@ -18,7 +18,7 @@ let gameState = {
 let winnerId = null;
 let startTime = 0;
 let finishedPlayers = [];
-const FINISH_LINE_X = 5000;
+const FINISH_LINE_X = 2000;
 const COUNTDOWN_TIME = 3;
 
 const TICK_RATE = 10;
@@ -54,12 +54,12 @@ io.on('connection', (socket) => {
         }
 
         const randomColor = Math.random() * 0xffffff;
-        const skyHeight = 110;
-        const padding = 30;
+        const skyHeight = 180;
+        const padding = 50;
 
         players[socket.id] = {
-            x: 100,
-            y: skyHeight + padding + ((Object.keys(players).length % 6) * 45),
+            x: 150,
+            y: skyHeight + padding + ((Object.keys(players).length % 6) * 70),
             id: socket.id,
             name,
             horseColor: randomColor
@@ -76,7 +76,7 @@ io.on('connection', (socket) => {
         winnerId = null;
         finishedPlayers = [];
 
-        Object.values(players).forEach(p => p.x = 100);
+        Object.values(players).forEach(p => p.x = 150);
 
         gameState.status = 'COUNTDOWN';
         io.emit('startCountdown');
@@ -149,7 +149,7 @@ io.on('connection', (socket) => {
         gameState.status = 'LOBBY';
 
         // reset vị trí (phòng trường hợp có ai không reload kịp)
-        Object.values(players).forEach(p => p.x = 100);
+        Object.values(players).forEach(p => p.x = 150);
 
         io.emit('forceReload');
     });
