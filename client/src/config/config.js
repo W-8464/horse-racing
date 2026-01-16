@@ -1,17 +1,20 @@
-// config.js
-
 export const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
     dom: {
-        createContainer: true
+        createContainer: true // 🔥 BẮT BUỘC
     },
     scale: {
+        // RESIZE: canvas sẽ luôn khớp với size của parent (#game-container).
+        // UI sẽ tự layout theo scene.scale.width/height trong từng scene.
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH,
-        // Cập nhật kích thước chuẩn mới
-        width: 932,
-        height: 430,
+
+        // Kích thước "thiết kế" (base) để làm chuẩn layout/font.
+        // Khi RESIZE, width/height ở đây chỉ là mặc định lúc init.
+        width: 1560,
+        height: 720,
+
         fullscreenTarget: 'game-container'
     },
     physics: {
@@ -21,15 +24,16 @@ export const config = {
 };
 
 export const GAME_SETTINGS = {
-    // Tối ưu cho tỉ lệ 932x430
-    DESIGN_WIDTH: 932,
-    DESIGN_HEIGHT: 430,
+    // Base design size (dùng làm tỉ lệ layout UI)
+    DESIGN_WIDTH: 1560,
+    DESIGN_HEIGHT: 720,
 
-    START_LINE_X: 100, // Thu hẹp lề một chút
-    FINISH_LINE_X: 5000, // Kéo dài đường đua để tận dụng màn hình ngang
-    WORLD_WIDTH: 5500,
+    START_LINE_X: 150,
+    FINISH_LINE_X: 2000,
+    WORLD_WIDTH: 2500,
 
     COUNTDOWN_TIME: 3,
+
     TICK_RATE: 20,
     INPUT_BATCH_MS: 50,
     CLICK_STEP_DISTANCE: 10
