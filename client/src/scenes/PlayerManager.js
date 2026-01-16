@@ -57,7 +57,6 @@ export default class PlayerManager {
             playerInfo.name
         );
 
-        other.serverIndex = playerInfo.serverIndex;
         other.setDepth(DEPTH.HORSE);
         other.play('horse_run');
         this.otherPlayers.add(other);
@@ -81,27 +80,25 @@ export default class PlayerManager {
 
         const interpolationFactor = (renderTime - b0.ts) / total;
 
-        this.otherPlayers.getChildren().forEach(horse => {
-            const idx = horse.serverIndex;
-            const x0 = b0.p[idx];
-            const x1 = b1.p[idx];
+        Object.keys(b1.players).forEach(id => {
+            // Không nội suy chính mình (vì mình di chuyển local)
+            if (this.state.role === 'player' && id === this.scene.network.socket.id) return;
 
-            if (x0 !== undefined && x1 !== undefined) {
-                const newX = x0 + (x1 - x0) * interpolationFactor;
-                if (Math.abs(horse.x - newX) > 0.1) {
-                    horse.x = newX;
-                    if (horse.playRun) horse.playRun();
+            const p0 = b0.players[id];
+            const p1 = b1.players[id];
+
+            if (p0 && p1) {
+                const other = this.otherPlayers.getChildren().find(p => p.playerId === id);
+                if (other) {
+                    // Nội suy tuyến tính: x = x0 + (x1 - x0) * factor
+                    const newX = p0.x + (p1.x - p0.x) * interpolationFactor;
+                    if (Math.abs(other.x - newX) > 0.5) {
+                        other.x = newX;
+                        if (other.playRun) other.playRun();
+                    }
                 }
             }
         });
-        if (this.state.role === 'host' && this.horse) {
-            const idx = this.horse.serverIndex;
-            const x0 = b0.p[idx];
-            const x1 = b1.p[idx];
-            if (x0 !== undefined && x1 !== undefined) {
-                this.horse.x = x0 + (x1 - x0) * interpolationFactor;
-            }
-        }
     }
 
     removeOther(playerId) {

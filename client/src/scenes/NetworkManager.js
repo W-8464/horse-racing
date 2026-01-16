@@ -112,21 +112,7 @@ export default class NetworkManager {
         });
 
         this.socket.on('gameStateUpdate', (data) => {
-            // Chuyển ArrayBuffer ngược lại thành Float32Array
-            const positions = new Float32Array(data.b);
-            const playerSnapshot = {};
-
-            for (let i = 0; i < positions.length; i += 2) {
-                const playerIdx = positions[i];
-                const x = positions[i + 1];
-                playerSnapshot[playerIdx] = x;
-            }
-
-            this.renderBuffer.push({
-                p: playerSnapshot,
-                ts: data.ts
-            });
-
+            this.renderBuffer.push(data);
             if (this.renderBuffer.length > 30) this.renderBuffer.shift();
         });
 
