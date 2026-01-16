@@ -37,9 +37,7 @@ export default class NetworkManager {
     }
 
     init() {
-        this.socket = io({
-            transports: ['websocket']
-        });
+        this.socket = io();
         this.bindListeners();
     }
 
@@ -114,13 +112,8 @@ export default class NetworkManager {
         });
 
         this.socket.on('gameStateUpdate', (data) => {
-            let rawBuffer = data.b;
-
-            if (!(rawBuffer instanceof ArrayBuffer) && rawBuffer.buffer) {
-                rawBuffer = rawBuffer.buffer;
-            }
-
-            const positions = new Float32Array(rawBuffer);
+            // Chuyển ArrayBuffer ngược lại thành Float32Array
+            const positions = new Float32Array(data.b);
             const playerSnapshot = {};
 
             for (let i = 0; i < positions.length; i += 2) {
