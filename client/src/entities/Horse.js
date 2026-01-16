@@ -8,7 +8,7 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
         this.baseColor = color;
         scene.add.existing(this);
         scene.physics.add.existing(this);
-        this.setScale(0.25);
+        this.setScale(0.2);
         this.setCollideWorldBounds(true);
         this.setTint(this.baseColor);
         this.setDepth(DEPTH.HORSE);

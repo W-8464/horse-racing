@@ -5,13 +5,13 @@ const PIXEL_INPUT_STYLE = `
   color: #5dfc9b;
   border: 4px solid #5dfc9b;
   font-family: monospace;
-  font-size: 24px;
-  padding: 12px;
+  font-size: 20px;
+  padding: 8px;
   outline: none;
   box-shadow: 0 0 0 4px #003b1f inset;
   appearance: none;
   -webkit-appearance: none;
-  width: 300px;
+  width: 260px;
   text-align: center;
 `;
 
@@ -20,10 +20,10 @@ const PIXEL_BTN_STYLE = `
   color: #5dfc9b;
   border: 4px solid #5dfc9b;
   font-family: monospace;
-  font-size: 22px;
-  padding: 12px 25px;
+  font-size: 18px;
+  padding: 8px 20px;
   cursor: pointer;
-  min-width: 140px;
+  min-width: 110px;
   margin: 10px;
   font-weight: bold;
   transition: all 0.1s;
@@ -49,9 +49,8 @@ export default class UIManager {
         this.winnerOverlay = null;
         this.winnerContainer = null;
 
-        // tỉ lệ y theo thiết kế 720px
-        this._ratioInputY = 300 / (GAME_SETTINGS.DESIGN_HEIGHT || 720);
-        this._ratioCountdownY = 200 / (GAME_SETTINGS.DESIGN_HEIGHT || 720);
+        this._ratioInputY = 0.45;
+        this._ratioCountdownY = 0.35;
     }
 
     _getLayout() {
@@ -60,8 +59,8 @@ export default class UIManager {
         const cx = w / 2;
         const cy = h / 2;
 
-        const baseW = GAME_SETTINGS.DESIGN_WIDTH || 1560;
-        const baseH = GAME_SETTINGS.DESIGN_HEIGHT || 720;
+        const baseW = GAME_SETTINGS.DESIGN_WIDTH;
+        const baseH = GAME_SETTINGS.DESIGN_HEIGHT;
 
         // scale UI nhẹ theo viewport (để màn nhỏ không bị tràn)
         const s = Phaser.Math.Clamp(Math.min(w / baseW, h / baseH), 0.65, 1.2);
@@ -73,19 +72,20 @@ export default class UIManager {
         const { w, h, cx, cy, s } = this._getLayout();
         const inputY = Math.round(h * this._ratioInputY);
         const countdownY = Math.round(h * this._ratioCountdownY);
+        const clampedScale = Math.min(s, h / 500);
 
         if (this.playerNameDom) {
             this.playerNameDom.setPosition(cx, inputY);
-            this.playerNameDom.setScale(s);
+            this.playerNameDom.setScale(clampedScale);
         }
         if (this.hostPassDom) {
             this.hostPassDom.setPosition(cx, inputY);
-            this.hostPassDom.setScale(s);
+            this.hostPassDom.setScale(clampedScale);
         }
 
         if (this.waitingText) {
             this.waitingText.setPosition(cx, inputY);
-            this.waitingText.setFontSize(Math.round(28 * s));
+            this.waitingText.setFontSize(Math.round(28 * clampedScale));
         }
         if (this.startButton) {
             this.startButton.setPosition(cx, inputY);
@@ -93,7 +93,7 @@ export default class UIManager {
         }
         if (this.countdownText) {
             this.countdownText.setPosition(cx, countdownY);
-            this.countdownText.setFontSize(Math.round(96 * s));
+            this.countdownText.setFontSize(Math.round(96 * clampedScale));
         }
 
         if (this.winnerOverlay) {
@@ -110,9 +110,9 @@ export default class UIManager {
     }
 
     showPlayerNameInput(onJoin, onHostClick) {
-        const { cx } = this._getLayout();
+        const { cx, cy } = this._getLayout();
 
-        const dom = this.scene.add.dom(cx, 300).createFromHTML(`
+        const dom = this.scene.add.dom(cx, cy).createFromHTML(`
       <div style="text-align:center">
         <div style="color:#5dfc9b;font-family:monospace;font-size:32px;margin-bottom:10px">
           ENTER NAME
