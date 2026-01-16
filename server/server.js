@@ -15,32 +15,19 @@ let gameState = {
     status: 'LOBBY', // LOBBY | COUNTDOWN | RUNNING
     hostId: null
 };
+let winnerId = null;
 let startTime = 0;
 let finishedPlayers = [];
 const FINISH_LINE_X = 5000;
 const COUNTDOWN_TIME = 3;
 
-const TICK_RATE = 10;
-const playerIndexMap = new Map();
-let nextFreeIndex = 0;
-const availableIndexes = [];
+const TICK_RATE = 20;
 
 setInterval(() => {
-    const ids = Object.keys(players);
-    if (ids.length > 0) {
-        // Mỗi người chơi cần 4 bytes cho tọa độ X (Float32)
-        const buffer = new Float32Array(ids.length * 2);
-        // Cấu trúc: [index_nguoi_choi_1, x_1, index_nguoi_choi_2, x_2, ...]
-
-        ids.forEach((id, i) => {
-            const idx = playerIndexMap.get(id);
-            buffer[i * 2] = idx;
-            buffer[i * 2 + 1] = players[id].x;
-        });
-
-        // Gửi Buffer thay vì JSON object
+    if (Object.keys(players).length > 0) {
+        // Gửi dữ liệu cho TẤT CẢ mọi người cùng lúc
         io.emit('gameStateUpdate', {
-            b: buffer.buffer, // Gửi ArrayBuffer thô
+            players: players,
             ts: Date.now()
         });
     }
@@ -70,34 +57,23 @@ io.on('connection', (socket) => {
         const skyHeight = 110;
         const padding = 30;
 
-        let assignedIndex;
-        if (availableIndexes.length > 0) {
-            // Ưu tiên lấy lại các index cũ đã thoát để mảng binary luôn gọn nhất
-            assignedIndex = availableIndexes.shift();
-        } else {
-            // Nếu không có index trống, lấy index mới tiếp theo
-            assignedIndex = nextFreeIndex++;
-        }
-
-        playerIndexMap.set(socket.id, assignedIndex);
-
         players[socket.id] = {
             x: 100,
             y: skyHeight + padding + ((Object.keys(players).length % 6) * 45),
             id: socket.id,
-            serverIndex: assignedIndex,
             name,
             horseColor: randomColor
         };
 
         socket.emit('currentPlayers', players);
         socket.broadcast.emit('newPlayer', players[socket.id]);
-        socket.emit('playerAccepted', { index: assignedIndex });
+        socket.emit('playerAccepted');
     });
 
     socket.on('hostStartGame', () => {
         if (socket.id !== gameState.hostId) return;
 
+        winnerId = null;
         finishedPlayers = [];
 
         Object.values(players).forEach(p => p.x = 100);
@@ -161,16 +137,6 @@ io.on('connection', (socket) => {
             finishedPlayers = [];
         }
 
-        const indexToFree = playerIndexMap.get(socket.id);
-
-        if (indexToFree !== undefined) {
-            // Đưa index vào danh sách chờ cấp phát lại
-            availableIndexes.push(indexToFree);
-            // Sắp xếp lại để ưu tiên cấp index nhỏ trước (giúp mảng binary ngắn nhất có thể)
-            availableIndexes.sort((a, b) => a - b);
-        }
-
-        playerIndexMap.delete(socket.id);
         delete players[socket.id];
         io.emit('playerDisconnected', socket.id);
     });
