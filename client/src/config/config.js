@@ -27,7 +27,7 @@ export const GAME_SETTINGS = {
 
     START_LINE_X: 100, // Thu hẹp lề một chút
     FINISH_LINE_X: 5000, // Kéo dài đường đua để tận dụng màn hình ngang
-    WORLD_WIDTH: 3500,
+    WORLD_WIDTH: 5500,
 
     COUNTDOWN_TIME: 3,
     TICK_RATE: 20,
