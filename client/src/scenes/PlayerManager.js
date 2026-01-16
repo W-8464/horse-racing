@@ -45,7 +45,10 @@ export default class PlayerManager {
         if (playerInfo.id === myId) return;
 
         const existing = this.otherPlayers.getChildren().find(p => p.playerId === playerInfo.id);
-        if (existing) return;
+        if (existing) {
+            existing.serverIndex = playerInfo.serverIndex;
+            return;
+        }
 
         const other = new Horse(
             this.scene,
