@@ -347,7 +347,7 @@ export default class UIManager {
 
         this.finishRankText = this.scene.add.text(
             cx, cy - 100,
-            `YOU FINISHED!\nRANK: ${rank}`,
+            `BẠN ĐÃ VỀ ĐÍCH!\nHẠNG: ${rank}`,
             {
                 fontSize: '32px',
                 fontFamily: 'monospace',

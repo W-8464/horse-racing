@@ -21,7 +21,7 @@ let finishedPlayers = [];
 const FINISH_LINE_X = 5000;
 const COUNTDOWN_TIME = 3;
 
-const TICK_RATE = 20;
+const TICK_RATE = 10;
 
 setInterval(() => {
     if (Object.keys(players).length > 0) {
