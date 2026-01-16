@@ -1,18 +1,34 @@
 const { io } = require("socket.io-client");
 
 const URL = "http://103.82.37.188/";
-const MAX_USERS = 100;
-const CLICK_SPEED = 100;
-const MOVE_STEP = 5;
+const MAX_USERS = 200;
 
+// ===== CẤU HÌNH HÀNH VI BOT =====
+const INPUT_INTERVAL_MIN = 120; // ms
+const INPUT_INTERVAL_MAX = 220; // ms
+const MOVE_STEP_MIN = 2.5;
+const MOVE_STEP_MAX = 4.5;
+
+const FINISH_LINE_X = 5000;
+
+function rand(min, max) {
+    return Math.random() * (max - min) + min;
+}
+
+// ===== PLAYER BOT =====
 function createPlayer(index) {
-    const socket = io(URL, { transports: ['websocket'], upgrade: false });
+    const socket = io(URL, {
+        transports: ["websocket"],
+        upgrade: false,
+        reconnection: false
+    });
 
-    let currentX = 100; // Vị trí bắt đầu trong code server của bạn
+    let currentX = 100;
     let isRunning = false;
+    let hasStarted = false;
+    let inputTimer = null;
 
     socket.on("connect", () => {
-        // 1. Tham gia vào game với role 'player'
         socket.emit("selectRole", {
             role: "player",
             name: `Bot_${index}`,
@@ -20,42 +36,106 @@ function createPlayer(index) {
         });
     });
 
-    // 2. Lắng nghe tín hiệu từ Host để bắt đầu chạy
+    // UI event – có thể miss → chỉ dùng làm phụ
     socket.on("startCountdown", () => {
-        // Chờ 4 giây (theo COUNTDOWN_TIME + 1 trong server) rồi bắt đầu chạy
-        setTimeout(() => {
-            isRunning = true;
-            console.log(`Bot ${index} bắt đầu chạy!`);
-        }, 4000);
+        setTimeout(startRunningIfNeeded, 4000);
     });
 
-    // Vòng lặp giả lập hành động click di chuyển
-    setInterval(() => {
-        if (isRunning) {
-            // Thêm một chút ngẫu nhiên để các bot không chạy khít nhau
-            currentX += (Math.random() * MOVE_STEP); 
+    // Snapshot event – KHÔNG BAO GIỜ miss
+    socket.on("gameStateUpdate", () => {
+        startRunningIfNeeded();
+    });
+
+    function startRunningIfNeeded() {
+        if (hasStarted) return;
+        hasStarted = true;
+        isRunning = true;
+        scheduleNextInput();
+    }
+
+    function scheduleNextInput() {
+        if (!isRunning) return;
+
+        const delay = rand(INPUT_INTERVAL_MIN, INPUT_INTERVAL_MAX);
+
+        inputTimer = setTimeout(() => {
+            if (!isRunning) return;
+
+            const step = rand(MOVE_STEP_MIN, MOVE_STEP_MAX);
+            currentX += step;
 
             socket.emit("playerMovement", { x: currentX });
 
-            if (currentX >= 5000) { // Khớp với FINISH_LINE_X trong config.js
+            if (currentX >= FINISH_LINE_X) {
                 isRunning = false;
+                return;
             }
-        }
-    }, CLICK_SPEED);
 
-    // Reset lại khi có lệnh từ Host
-    socket.on("raceReset", () => {
-        currentX = 150;
+            // 5% chance pause (giả lập người chơi khựng tay)
+            if (Math.random() < 0.05) {
+                setTimeout(scheduleNextInput, rand(300, 600));
+            } else {
+                scheduleNextInput();
+            }
+        }, delay);
+    }
+
+    socket.on("youFinished", () => {
         isRunning = false;
+        if (inputTimer) clearTimeout(inputTimer);
+    });
+
+    socket.on("raceReset", () => {
+        currentX = 100;
+        isRunning = false;
+        hasStarted = false;
+        if (inputTimer) clearTimeout(inputTimer);
     });
 
     socket.on("disconnect", () => {
         isRunning = false;
+        if (inputTimer) clearTimeout(inputTimer);
     });
 }
 
-// Khởi tạo 200 bot, mỗi bot cách nhau 50ms để tránh nghẽn mạng cục bộ
-console.log(`Đang khởi tạo ${MAX_USERS} bot...`);
-for (let i = 0; i < MAX_USERS; i++) {
-    setTimeout(() => createPlayer(i), i * 50);
+// ===== HOST BOT =====
+function createHostBot() {
+    const socket = io(URL, {
+        transports: ["websocket"],
+        upgrade: false
+    });
+
+    socket.on("connect", () => {
+        socket.emit("selectRole", {
+            role: "host",
+            name: "BOT_HOST",
+            password: "a"
+        });
+    });
+
+    socket.on("hostAccepted", () => {
+        console.log("[HOST BOT] connected");
+    });
+
+    return socket;
 }
+
+// ===== MAIN =====
+console.log(`Khởi tạo ${MAX_USERS} fake clients...`);
+
+const hostSocket = createHostBot();
+
+// Đợi host ổn định
+setTimeout(() => {
+    // Spawn player bot rải đều
+    for (let i = 0; i < MAX_USERS; i++) {
+        setTimeout(() => createPlayer(i), i * 60);
+    }
+
+    // Đợi player connect gần xong rồi start game
+    setTimeout(() => {
+        console.log("[HOST BOT] start game");
+        hostSocket.emit("hostStartGame");
+    }, MAX_USERS * 60 + 1000);
+
+}, 1500);

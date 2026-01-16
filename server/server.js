@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
+    transports: ['websocket'],
     pingTimeout: 30000,
     pingInterval: 10000
 });
@@ -40,7 +41,7 @@ setInterval(() => {
 
         // Gửi Buffer thay vì JSON object
         io.emit('gameStateUpdate', {
-            b: buffer.buffer, // Gửi ArrayBuffer thô
+            b: buffer,
             ts: Date.now()
         });
     }
