@@ -3,7 +3,7 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     transports: ['websocket'],
-    pingTimeout: 30000,
+    pingTimeout: 60000,
     pingInterval: 10000
 });
 const path = require('path');
@@ -12,6 +12,7 @@ app.use(express.static(path.join(__dirname, '../client')));
 
 const players = {};
 const HOST_PASSWORD = 'a';
+const disconnectTimeouts = {};
 let gameState = {
     status: 'LOBBY', // LOBBY | COUNTDOWN | RUNNING
     hostId: null
@@ -154,26 +155,31 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('Người chơi thoát:', socket.id);
+        console.log('Người chơi mất kết nối tạm thời:', socket.id);
 
-        if (socket.id === gameState.hostId) {
-            gameState.hostId = null;
-            gameState.status = 'LOBBY';
-            finishedPlayers = [];
-        }
+        const player = players[socket.id];
+        if (!player) return;
 
-        const indexToFree = playerIndexMap.get(socket.id);
+        disconnectTimeouts[socket.id] = setTimeout(() => {
+            console.log('Xóa hẳn người chơi:', socket.id);
 
-        if (indexToFree !== undefined) {
-            // Đưa index vào danh sách chờ cấp phát lại
-            availableIndexes.push(indexToFree);
-            // Sắp xếp lại để ưu tiên cấp index nhỏ trước (giúp mảng binary ngắn nhất có thể)
-            availableIndexes.sort((a, b) => a - b);
-        }
+            const indexToFree = playerIndexMap.get(socket.id);
+            if (indexToFree !== undefined) {
+                availableIndexes.push(indexToFree);
+                availableIndexes.sort((a, b) => a - b);
+            }
 
-        playerIndexMap.delete(socket.id);
-        delete players[socket.id];
-        io.emit('playerDisconnected', socket.id);
+            playerIndexMap.delete(socket.id);
+            delete players[socket.id];
+            delete disconnectTimeouts[socket.id];
+
+            io.emit('playerDisconnected', socket.id);
+
+            if (socket.id === gameState.hostId) {
+                gameState.hostId = null;
+                gameState.status = 'LOBBY';
+            }
+        }, 60000);
     });
 
     // Host bấm "PLAY AGAIN" -> ép tất cả client reload trang
