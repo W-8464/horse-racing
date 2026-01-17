@@ -22,14 +22,14 @@ export default class NetworkManager {
                 // Khi quay lại, tính toán thời gian đã trôi qua
                 const timeAway = (Date.now() - this.hiddenTime) / 1000;
 
-                if (timeAway > 30) {
-                    // Nếu quá 30 giây, tải lại trang để làm sạch trạng thái
+                if (timeAway > 60) {
                     window.location.reload();
                 } else {
-                    // Nếu dưới 30 giây, kiểm tra xem socket còn sống không
-                    // Nếu mất kết nối thì cũng nên reload hoặc kết nối lại
                     if (this.socket && !this.socket.connected) {
                         this.socket.connect();
+                        if (this.state.name) {
+                            this.selectRolePlayer(this.state.name);
+                        }
                     }
                 }
             }
