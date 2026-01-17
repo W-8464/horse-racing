@@ -1,7 +1,7 @@
 const { io } = require("socket.io-client");
 
 const URL = "http://103.82.37.188/";
-const MAX_USERS = 50;
+const MAX_USERS = 200;
 
 // ===== CẤU HÌNH HÀNH VI BOT =====
 const INPUT_INTERVAL_MIN = 120; // ms

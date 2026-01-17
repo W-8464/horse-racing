@@ -192,7 +192,7 @@ io.on('connection', (socket) => {
         // reset vị trí (phòng trường hợp có ai không reload kịp)
         Object.values(players).forEach(p => p.x = 100);
 
-        io.emit('raceReset', players);
+        io.emit('forceReload');
     });
 
 
