@@ -9,8 +9,30 @@ export default class NetworkManager {
         this.renderBuffer = [];
         this.bufferDelay = 100;
 
+        // Mobile background thường làm rớt WebSocket => cần auto re-join khi reconnect
+        this.rolePayload = null; // { role: 'player'|'host', name?, password?, token? }
+        this.localPlayerId = null; // id ổn định do server trả về (không phụ thuộc socket.id)
+        this.TOKEN_KEY = 'horse_race_token';
+        this.NAME_KEY = 'horse_race_name';
+
         this.hiddenTime = 0;
         this.setupVisibilityListener();
+    }
+
+    getLocalPlayerId() {
+        return this.localPlayerId || (this.state && this.state.playerId) || (this.socket ? this.socket.id : null);
+    }
+
+    tryAutoRejoin() {
+        if (!this.socket || !this.socket.connected) return;
+        if (!this.rolePayload || !this.rolePayload.role) return;
+
+        // Gắn token (nếu có) để server resume đúng player cũ
+        const storedToken = localStorage.getItem(this.TOKEN_KEY);
+        if (storedToken) this.rolePayload.token = storedToken;
+
+        // Re-emit selectRole sau reconnect
+        this.socket.emit('selectRole', this.rolePayload);
     }
 
     setupVisibilityListener() {
@@ -22,14 +44,14 @@ export default class NetworkManager {
                 // Khi quay lại, tính toán thời gian đã trôi qua
                 const timeAway = (Date.now() - this.hiddenTime) / 1000;
 
-                if (timeAway > 60) {
+                if (timeAway > 30) {
+                    // Nếu quá 30 giây, tải lại trang để làm sạch trạng thái
                     window.location.reload();
                 } else {
+                    // Nếu dưới 30 giây, kiểm tra xem socket còn sống không
+                    // Nếu mất kết nối thì cũng nên reload hoặc kết nối lại
                     if (this.socket && !this.socket.connected) {
                         this.socket.connect();
-                        if (this.state.name) {
-                            this.selectRolePlayer(this.state.name);
-                        }
                     }
                 }
             }
@@ -38,18 +60,34 @@ export default class NetworkManager {
 
     init() {
         this.socket = io({
-            transports: ['websocket']
+            transports: ['websocket'],
+            reconnection: true,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 500,
+            reconnectionDelayMax: 2000,
+            timeout: 20000
         });
+
+        // 'connect' sẽ chạy cả lần đầu và sau khi reconnect
+        this.socket.on('connect', () => {
+            this.tryAutoRejoin();
+        });
+
+        // Khi mất kết nối, chặn gửi input để tránh "đua local" mà server không nhận
+        this.socket.on('disconnect', () => {
+            // Có thể thêm UI "Reconnecting..." nếu muốn
+        });
+
         this.bindListeners();
     }
 
     bindListeners() {
         this.socket.on('currentPlayers', (players) => {
-            this.players.syncCurrentPlayers(players, this.socket.id);
+            this.players.syncCurrentPlayers(players, this.getLocalPlayerId());
         });
 
         this.socket.on('newPlayer', (playerInfo) => {
-            this.players.addOther(playerInfo, this.socket.id);
+            this.players.addOther(playerInfo, this.getLocalPlayerId());
         });
 
         this.socket.on('playerMoved', (playerInfo) => {
@@ -64,7 +102,7 @@ export default class NetworkManager {
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
 
-            this.players.resetPositionsFromServer(players, this.socket.id);
+            this.players.resetPositionsFromServer(players, this.getLocalPlayerId());
 
             // UI theo role
             this.ui.destroyWinner();
@@ -86,7 +124,17 @@ export default class NetworkManager {
             this.ui.showStartButton(() => this.hostStartGame());
         });
 
-        this.socket.on('playerAccepted', () => {
+        this.socket.on('playerAccepted', (data) => {
+            // Server sẽ trả token + playerId để client resume được sau reconnect
+            if (data && data.token) {
+                localStorage.setItem(this.TOKEN_KEY, data.token);
+                if (this.rolePayload) this.rolePayload.token = data.token;
+            }
+            if (data && data.playerId) {
+                this.localPlayerId = data.playerId;
+                this.state.playerId = data.playerId;
+            }
+
             if (this.state.role === 'player') {
                 // player đã được server accept => chờ host start
                 this.ui.showWaitingText();
@@ -140,8 +188,6 @@ export default class NetworkManager {
         this.socket.on('forceReload', () => {
             window.location.reload();
         });
-
-        this.socket.off('playerMoved');
     }
 
     getInterpolatedState() {
@@ -164,11 +210,25 @@ export default class NetworkManager {
 
     // emits
     selectRolePlayer(name) {
-        this.socket.emit('selectRole', { role: 'player', name });
+        this.state.role = 'player';
+        localStorage.setItem(this.NAME_KEY, name);
+
+        this.rolePayload = {
+            role: 'player',
+            name,
+            token: localStorage.getItem(this.TOKEN_KEY) || undefined
+        };
+
+        this.socket.emit('selectRole', this.rolePayload);
     }
 
     selectRoleHost(password) {
-        this.socket.emit('selectRole', { role: 'host', password });
+        this.state.role = 'host';
+        this.rolePayload = {
+            role: 'host',
+            password
+        };
+        this.socket.emit('selectRole', this.rolePayload);
     }
 
     hostStartGame() {
@@ -176,6 +236,8 @@ export default class NetworkManager {
     }
 
     emitMovement(x) {
+        // Nếu đang disconnect (mobile background), đừng cho đua local nữa
+        if (!this.socket || !this.socket.connected) return;
         this.socket.emit('playerMovement', { x });
     }
 

@@ -4,15 +4,55 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     transports: ['websocket'],
     pingTimeout: 60000,
-    pingInterval: 10000
+    pingInterval: 20000
 });
 const path = require('path');
+const crypto = require('crypto');
 
 app.use(express.static(path.join(__dirname, '../client')));
 
 const players = {};
 const HOST_PASSWORD = 'a';
-const disconnectTimeouts = {};
+
+// Mobile: khi chuyển app/tab, WebSocket hay bị drop => giữ player lại 1 thời gian để resume
+const DISCONNECT_GRACE_MS = 60 * 1000;
+const sessionToPlayerId = new Map(); // token -> playerId (ổn định)
+const pendingRemoval = new Map(); // playerId -> timeout
+
+function genToken() {
+    if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return crypto.randomBytes(16).toString('hex');
+}
+
+function cancelRemoval(playerId) {
+    const t = pendingRemoval.get(playerId);
+    if (t) clearTimeout(t);
+    pendingRemoval.delete(playerId);
+}
+
+function finalizeRemoval(playerId) {
+    const p = players[playerId];
+    if (!p) return;
+
+    const idx = playerIndexMap.get(playerId);
+    if (idx !== undefined) {
+        availableIndexes.push(idx);
+        availableIndexes.sort((a, b) => a - b);
+    }
+
+    playerIndexMap.delete(playerId);
+    if (p.token) sessionToPlayerId.delete(p.token);
+    delete players[playerId];
+    pendingRemoval.delete(playerId);
+
+    io.emit('playerDisconnected', playerId);
+}
+
+function scheduleRemoval(playerId) {
+    cancelRemoval(playerId);
+    const t = setTimeout(() => finalizeRemoval(playerId), DISCONNECT_GRACE_MS);
+    pendingRemoval.set(playerId, t);
+}
 let gameState = {
     status: 'LOBBY', // LOBBY | COUNTDOWN | RUNNING
     hostId: null
@@ -52,7 +92,7 @@ io.on('connection', (socket) => {
     console.log('Người chơi mới:', socket.id);
 
     socket.on('selectRole', (data) => {
-        const { role, name, password } = data;
+        const { role, name, password, token } = data || {};
         socket.role = role;
 
         if (role === 'host') {
@@ -62,39 +102,81 @@ io.on('connection', (socket) => {
             }
 
             gameState.hostId = socket.id;
+            socket.playerId = socket.id;
 
             socket.emit('currentPlayers', players);
             socket.emit('hostAccepted');
             return;
         }
 
+        // ===== PLAYER (new / resume) =====
+        let playerId;
+        let sessionToken = token;
+
+        // Nếu có token hợp lệ thì resume đúng player cũ (giữ nguyên x, serverIndex, id)
+        if (sessionToken && sessionToPlayerId.has(sessionToken)) {
+            playerId = sessionToPlayerId.get(sessionToken);
+        } else {
+            // New player
+            playerId = socket.id; // id ổn định cho player (khác với socket.id về sau khi reconnect)
+            sessionToken = genToken();
+            sessionToPlayerId.set(sessionToken, playerId);
+        }
+
+        socket.playerId = playerId;
+        socket.token = sessionToken;
+
+        // Resume case
+        if (players[playerId]) {
+            cancelRemoval(playerId);
+            players[playerId].connected = true;
+            players[playerId].socketId = socket.id;
+            if (typeof name === 'string' && name.trim()) players[playerId].name = name;
+
+            socket.emit('currentPlayers', players);
+            socket.emit('playerAccepted', {
+                index: playerIndexMap.get(playerId),
+                token: sessionToken,
+                playerId,
+                resumed: true
+            });
+            return;
+        }
+
+        // New join
         const randomColor = Math.random() * 0xffffff;
         const skyHeight = 110;
         const padding = 30;
 
         let assignedIndex;
         if (availableIndexes.length > 0) {
-            // Ưu tiên lấy lại các index cũ đã thoát để mảng binary luôn gọn nhất
             assignedIndex = availableIndexes.shift();
         } else {
-            // Nếu không có index trống, lấy index mới tiếp theo
             assignedIndex = nextFreeIndex++;
         }
 
-        playerIndexMap.set(socket.id, assignedIndex);
+        playerIndexMap.set(playerId, assignedIndex);
 
-        players[socket.id] = {
+        players[playerId] = {
             x: 100,
             y: skyHeight + padding + ((Object.keys(players).length % 6) * 45),
-            id: socket.id,
+            id: playerId,
             serverIndex: assignedIndex,
             name,
-            horseColor: randomColor
+            horseColor: randomColor,
+            token: sessionToken,
+            connected: true,
+            socketId: socket.id
         };
 
         socket.emit('currentPlayers', players);
-        socket.broadcast.emit('newPlayer', players[socket.id]);
-        socket.emit('playerAccepted', { index: assignedIndex });
+        socket.broadcast.emit('newPlayer', players[playerId]);
+        socket.emit('playerAccepted', {
+            index: assignedIndex,
+            token: sessionToken,
+            playerId,
+            resumed: false
+        });
     });
 
     socket.on('hostStartGame', () => {
@@ -116,11 +198,12 @@ io.on('connection', (socket) => {
     socket.on('playerMovement', (data) => {
         if (socket.role !== 'player' || gameState.status !== 'RUNNING') return;
 
-        const player = players[socket.id];
+        const playerId = socket.playerId || socket.id;
+        const player = players[playerId];
         if (!player) return;
 
         // Nếu người chơi đã có trong danh sách về đích, không cho di chuyển tiếp (tùy chọn)
-        const alreadyFinished = finishedPlayers.find(p => p.id === socket.id);
+        const alreadyFinished = finishedPlayers.find(p => p.id === playerId);
         if (alreadyFinished) return;
 
         player.x = data.x;
@@ -128,7 +211,7 @@ io.on('connection', (socket) => {
         if (data.x >= FINISH_LINE_X) {
             const finishTime = ((Date.now() - startTime) / 1000).toFixed(2);
             finishedPlayers.push({
-                id: socket.id,
+                id: playerId,
                 name: player.name,
                 finishTime: finishTime
             });
@@ -136,7 +219,8 @@ io.on('connection', (socket) => {
             // Gửi thông báo riêng cho người vừa về đích (để client dừng input/hiện hiệu ứng)
             socket.emit('youFinished', { rank: finishedPlayers.length });
 
-            const totalPlayers = Object.keys(players).length;
+            // Chỉ tính người đang online để tránh case mobile rớt mạng làm race không bao giờ FINISHED
+            const totalPlayers = Object.values(players).filter(p => p && p.connected).length;
             const limit = Math.min(10, totalPlayers);
 
             if (finishedPlayers.length >= limit) {
@@ -155,31 +239,22 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('Người chơi mất kết nối tạm thời:', socket.id);
+        console.log('Người chơi thoát:', socket.id);
 
-        const player = players[socket.id];
-        if (!player) return;
+        if (socket.id === gameState.hostId) {
+            gameState.hostId = null;
+            gameState.status = 'LOBBY';
+            finishedPlayers = [];
+            return;
+        }
 
-        disconnectTimeouts[socket.id] = setTimeout(() => {
-            console.log('Xóa hẳn người chơi:', socket.id);
+        // Player: không xoá ngay, cho phép reconnect trong DISCONNECT_GRACE_MS
+        const playerId = socket.playerId;
+        if (!playerId || !players[playerId]) return;
 
-            const indexToFree = playerIndexMap.get(socket.id);
-            if (indexToFree !== undefined) {
-                availableIndexes.push(indexToFree);
-                availableIndexes.sort((a, b) => a - b);
-            }
-
-            playerIndexMap.delete(socket.id);
-            delete players[socket.id];
-            delete disconnectTimeouts[socket.id];
-
-            io.emit('playerDisconnected', socket.id);
-
-            if (socket.id === gameState.hostId) {
-                gameState.hostId = null;
-                gameState.status = 'LOBBY';
-            }
-        }, 60000);
+        players[playerId].connected = false;
+        players[playerId].lastDisconnectAt = Date.now();
+        scheduleRemoval(playerId);
     });
 
     // Host bấm "PLAY AGAIN" -> ép tất cả client reload trang
