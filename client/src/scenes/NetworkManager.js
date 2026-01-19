@@ -22,22 +22,13 @@ export default class NetworkManager {
                 return;
             }
 
-            // Vừa quay lại tab
             const timeAway = (Date.now() - this.hiddenTime) / 1000;
 
-            // Không disconnect/connect nữa.
-            // Nếu socket thật sự đang disconnected thì mới connect lại.
             if (this.socket?.disconnected) {
                 this.socket.connect();
             }
 
-            // (Tuỳ chọn) xin server sync lại danh sách player để chắc ăn
-            if (this.socket?.connected) {
-                this.socket.emit('requestSync');
-            }
-
-            // Nếu bạn muốn giữ logic "đi xa quá lâu thì reload" thì để mốc lớn hơn nhiều (vd 30-60s)
-            // if (timeAway > 60) window.location.reload();
+            if (timeAway > 60) window.location.reload();
         });
     }
 
