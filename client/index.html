@@ -56,11 +56,27 @@
             outline: none;
             -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
         }
+
+        #version-tag {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            /* Màu trắng mờ để không gây xao nhãng */
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            z-index: 100;
+            /* Đảm bảo luôn nằm trên cùng của game */
+            pointer-events: none;
+            /* Giúp người dùng click xuyên qua thẻ này để tương tác với game */
+            user-select: none;
+        }
     </style>
 </head>
 
 <body>
     <div id="game-container"></div>
+    <div id="version-tag">v1.0.0</div>
     <script type="module" src="src/main.js"></script>
 </body>
 
