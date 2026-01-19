@@ -5,6 +5,8 @@ export default class NetworkManager {
         this.players = players;
         this.ui = ui;
 
+        this.playerName = null;
+
         this.socket = null;
         this.renderBuffer = [];
         this.bufferDelay = 100;
@@ -16,30 +18,47 @@ export default class NetworkManager {
     setupVisibilityListener() {
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
-                // Lưu thời điểm bắt đầu rời tab
                 this.hiddenTime = Date.now();
-            } else if (document.visibilityState === 'visible') {
-                // Khi quay lại, tính toán thời gian đã trôi qua
-                const timeAway = (Date.now() - this.hiddenTime) / 1000;
-
-                if (timeAway > 30) {
-                    // Nếu quá 30 giây, tải lại trang để làm sạch trạng thái
-                    window.location.reload();
-                } else {
-                    // Nếu dưới 30 giây, kiểm tra xem socket còn sống không
-                    // Nếu mất kết nối thì cũng nên reload hoặc kết nối lại
-                    if (this.socket && !this.socket.connected) {
-                        this.socket.connect();
-                    }
-                }
+                return;
             }
+
+            // Vừa quay lại tab
+            const timeAway = (Date.now() - this.hiddenTime) / 1000;
+
+            // Không disconnect/connect nữa.
+            // Nếu socket thật sự đang disconnected thì mới connect lại.
+            if (this.socket?.disconnected) {
+                this.socket.connect();
+            }
+
+            // (Tuỳ chọn) xin server sync lại danh sách player để chắc ăn
+            if (this.socket?.connected) {
+                this.socket.emit('requestSync');
+            }
+
+            // Nếu bạn muốn giữ logic "đi xa quá lâu thì reload" thì để mốc lớn hơn nhiều (vd 30-60s)
+            // if (timeAway > 60) window.location.reload();
         });
     }
+
 
     init() {
         this.socket = io({
             transports: ['websocket']
         });
+
+        const rejoin = () => {
+            if (this.state.role === 'player' && this.playerName) {
+                this.socket.emit('selectRole', { role: 'player', name: this.playerName });
+            }
+            if (this.state.role === 'host' && this.ui.cachedHostPassword) {
+                this.socket.emit('selectRole', { role: 'host', password: this.ui.cachedHostPassword });
+            }
+        };
+
+        this.socket.on('connect', rejoin);
+        this.socket.io.on('reconnect', rejoin);
+
         this.bindListeners();
     }
 
@@ -164,6 +183,7 @@ export default class NetworkManager {
 
     // emits
     selectRolePlayer(name) {
+        this.playerName = name;
         this.socket.emit('selectRole', { role: 'player', name });
     }
 
