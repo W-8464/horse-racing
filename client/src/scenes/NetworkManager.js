@@ -5,89 +5,70 @@ export default class NetworkManager {
         this.players = players;
         this.ui = ui;
 
+        this.playerName = null;
+
         this.socket = null;
         this.renderBuffer = [];
         this.bufferDelay = 100;
-
-        // Mobile background thường làm rớt WebSocket => cần auto re-join khi reconnect
-        this.rolePayload = null; // { role: 'player'|'host', name?, password?, token? }
-        this.localPlayerId = null; // id ổn định do server trả về (không phụ thuộc socket.id)
-        this.TOKEN_KEY = 'horse_race_token';
-        this.NAME_KEY = 'horse_race_name';
 
         this.hiddenTime = 0;
         this.setupVisibilityListener();
     }
 
-    getLocalPlayerId() {
-        return this.localPlayerId || (this.state && this.state.playerId) || (this.socket ? this.socket.id : null);
-    }
-
-    tryAutoRejoin() {
-        if (!this.socket || !this.socket.connected) return;
-        if (!this.rolePayload || !this.rolePayload.role) return;
-
-        // Gắn token (nếu có) để server resume đúng player cũ
-        const storedToken = localStorage.getItem(this.TOKEN_KEY);
-        if (storedToken) this.rolePayload.token = storedToken;
-
-        // Re-emit selectRole sau reconnect
-        this.socket.emit('selectRole', this.rolePayload);
-    }
-
     setupVisibilityListener() {
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
-                // Lưu thời điểm bắt đầu rời tab
                 this.hiddenTime = Date.now();
-            } else if (document.visibilityState === 'visible') {
-                // Khi quay lại, tính toán thời gian đã trôi qua
-                const timeAway = (Date.now() - this.hiddenTime) / 1000;
-
-                if (timeAway > 30) {
-                    // Nếu quá 30 giây, tải lại trang để làm sạch trạng thái
-                    window.location.reload();
-                } else {
-                    // Nếu dưới 30 giây, kiểm tra xem socket còn sống không
-                    // Nếu mất kết nối thì cũng nên reload hoặc kết nối lại
-                    if (this.socket && !this.socket.connected) {
-                        this.socket.connect();
-                    }
-                }
+                return;
             }
+
+            // Vừa quay lại tab
+            const timeAway = (Date.now() - this.hiddenTime) / 1000;
+
+            // Không disconnect/connect nữa.
+            // Nếu socket thật sự đang disconnected thì mới connect lại.
+            if (this.socket?.disconnected) {
+                this.socket.connect();
+            }
+
+            // (Tuỳ chọn) xin server sync lại danh sách player để chắc ăn
+            if (this.socket?.connected) {
+                this.socket.emit('requestSync');
+            }
+
+            // Nếu bạn muốn giữ logic "đi xa quá lâu thì reload" thì để mốc lớn hơn nhiều (vd 30-60s)
+            // if (timeAway > 60) window.location.reload();
         });
     }
 
+
     init() {
         this.socket = io({
-            transports: ['websocket'],
-            reconnection: true,
-            reconnectionAttempts: Infinity,
-            reconnectionDelay: 500,
-            reconnectionDelayMax: 2000,
-            timeout: 20000
+            transports: ['websocket']
         });
 
-        // 'connect' sẽ chạy cả lần đầu và sau khi reconnect
-        this.socket.on('connect', () => {
-            this.tryAutoRejoin();
-        });
+        const rejoin = () => {
+            if (this.state.role === 'player' && this.playerName) {
+                this.socket.emit('selectRole', { role: 'player', name: this.playerName });
+            }
+            if (this.state.role === 'host' && this.ui.cachedHostPassword) {
+                this.socket.emit('selectRole', { role: 'host', password: this.ui.cachedHostPassword });
+            }
+        };
 
-        // Khi mất kết nối, chặn gửi input để tránh "đua local" mà server không nhận
-        this.socket.on('disconnect', () => {
-            // Có thể thêm UI "Reconnecting..." nếu muốn
-        });
+        this.socket.on('connect', rejoin);
+        this.socket.io.on('reconnect', rejoin);
 
         this.bindListeners();
     }
 
     bindListeners() {
         this.socket.on('currentPlayers', (players) => {
-            this.players.syncCurrentPlayers(players, this.getLocalPlayerId());
+            this.players.syncCurrentPlayers(players, this.socket.id);
         });
 
         this.socket.on('newPlayer', (playerInfo) => {
-            this.players.addOther(playerInfo, this.getLocalPlayerId());
+            this.players.addOther(playerInfo, this.socket.id);
         });
 
         this.socket.on('playerMoved', (playerInfo) => {
@@ -102,7 +83,7 @@ export default class NetworkManager {
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
 
-            this.players.resetPositionsFromServer(players, this.getLocalPlayerId());
+            this.players.resetPositionsFromServer(players, this.socket.id);
 
             // UI theo role
             this.ui.destroyWinner();
@@ -124,17 +105,7 @@ export default class NetworkManager {
             this.ui.showStartButton(() => this.hostStartGame());
         });
 
-        this.socket.on('playerAccepted', (data) => {
-            // Server sẽ trả token + playerId để client resume được sau reconnect
-            if (data && data.token) {
-                localStorage.setItem(this.TOKEN_KEY, data.token);
-                if (this.rolePayload) this.rolePayload.token = data.token;
-            }
-            if (data && data.playerId) {
-                this.localPlayerId = data.playerId;
-                this.state.playerId = data.playerId;
-            }
-
+        this.socket.on('playerAccepted', () => {
             if (this.state.role === 'player') {
                 // player đã được server accept => chờ host start
                 this.ui.showWaitingText();
@@ -188,6 +159,8 @@ export default class NetworkManager {
         this.socket.on('forceReload', () => {
             window.location.reload();
         });
+
+        this.socket.off('playerMoved');
     }
 
     getInterpolatedState() {
@@ -210,25 +183,12 @@ export default class NetworkManager {
 
     // emits
     selectRolePlayer(name) {
-        this.state.role = 'player';
-        localStorage.setItem(this.NAME_KEY, name);
-
-        this.rolePayload = {
-            role: 'player',
-            name,
-            token: localStorage.getItem(this.TOKEN_KEY) || undefined
-        };
-
-        this.socket.emit('selectRole', this.rolePayload);
+        this.playerName = name;
+        this.socket.emit('selectRole', { role: 'player', name });
     }
 
     selectRoleHost(password) {
-        this.state.role = 'host';
-        this.rolePayload = {
-            role: 'host',
-            password
-        };
-        this.socket.emit('selectRole', this.rolePayload);
+        this.socket.emit('selectRole', { role: 'host', password });
     }
 
     hostStartGame() {
@@ -236,8 +196,6 @@ export default class NetworkManager {
     }
 
     emitMovement(x) {
-        // Nếu đang disconnect (mobile background), đừng cho đua local nữa
-        if (!this.socket || !this.socket.connected) return;
         this.socket.emit('playerMovement', { x });
     }
 

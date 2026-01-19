@@ -154,7 +154,7 @@ export default class UIManager {
         }
     }
 
-    showHostPasswordInput(onConfirm) {
+    showHostPasswordInput(onConfirm, onBackToPlayer) {
         const { cx } = this._getLayout();
 
         const dom = this.scene.add.dom(cx, 300).createFromHTML(`
@@ -165,6 +165,7 @@ export default class UIManager {
         <input id="hostPass" type="password" style="${PIXEL_INPUT_STYLE}" />
         <br/><br/>
         <button id="hostBtn" style="${PIXEL_BTN_STYLE}">CONFIRM</button>
+        <button id="backBtn" style="${PIXEL_BTN_STYLE}; background: #444;">PLAYER</button>
         <div id="error"
           style="color:#ff1744;font-family:monospace;font-size:14px;margin-top:8px;display:none">
           INVALID PASSWORD
@@ -176,12 +177,16 @@ export default class UIManager {
 
         dom.addListener('click');
         dom.on('click', (e) => {
-            if (e.target.id !== 'hostBtn') return;
+            if (e.target.id === 'hostBtn') {
+                const pass = dom.getChildByID('hostPass').value.trim();
+                if (!pass) return;
+                onConfirm?.(pass);
+            }
 
-            const pass = dom.getChildByID('hostPass').value.trim();
-            if (!pass) return;
-
-            onConfirm?.(pass);
+            if (e.target.id === 'backBtn') {
+                this.destroyHostPasswordInput();
+                onBackToPlayer?.();
+            }
         });
 
         this.layout();

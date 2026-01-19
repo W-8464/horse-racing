@@ -69,21 +69,7 @@ export default class GameScene extends Phaser.Scene {
 
         this.setupRestartHandler();
 
-        this.ui.showPlayerNameInput(
-            (name) => {
-                this.handleFullScreen();
-                this.state.role = 'player';
-                this.network.selectRolePlayer(name);
-                this.ui.showWaitingText();
-            },
-            () => {
-                this.handleFullScreen();
-                this.ui.showHostPasswordInput((password) => {
-                    this.state.role = 'host';
-                    this.network.selectRoleHost(password);
-                });
-            }
-        );
+        this.showInitialUI();
     }
 
     setupResizeHandler() {
@@ -164,6 +150,29 @@ export default class GameScene extends Phaser.Scene {
         if (!this.scale.isFullscreen) {
             this.scale.startFullscreen();
         }
+    }
+
+    showInitialUI() {
+        this.ui.showPlayerNameInput(
+            (name) => {
+                this.handleFullScreen();
+                this.state.role = 'player';
+                this.network.selectRolePlayer(name);
+                this.ui.showWaitingText();
+            },
+            () => {
+                this.handleFullScreen();
+                this.ui.showHostPasswordInput(
+                    (password) => {
+                        this.state.role = 'host';
+                        this.network.selectRoleHost(password);
+                    },
+                    () => {
+                        this.showInitialUI();
+                    }
+                );
+            }
+        );
     }
 
     update() {
