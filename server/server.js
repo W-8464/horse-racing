@@ -3,7 +3,7 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     transports: ['websocket'],
-    pingTimeout: 60000,
+    pingTimeout: 30000,
     pingInterval: 10000
 });
 const path = require('path');
@@ -67,33 +67,28 @@ io.on('connection', (socket) => {
             return;
         }
 
-        let horseColor;
-        if (existingPlayer) {
-            horseColor = existingPlayer.horseColor;
-            delete players[existingPlayer.id];
-        } else {
-            horseColor = Math.random() * 0xffffff;
-        }
-
+        const randomColor = Math.random() * 0xffffff;
         const skyHeight = 110;
         const padding = 30;
 
         let assignedIndex;
         if (availableIndexes.length > 0) {
+            // Ưu tiên lấy lại các index cũ đã thoát để mảng binary luôn gọn nhất
             assignedIndex = availableIndexes.shift();
         } else {
+            // Nếu không có index trống, lấy index mới tiếp theo
             assignedIndex = nextFreeIndex++;
         }
 
         playerIndexMap.set(socket.id, assignedIndex);
 
         players[socket.id] = {
-            x: existingPlayer ? existingPlayer.x : 100,
+            x: 100,
             y: skyHeight + padding + ((Object.keys(players).length % 6) * 45),
             id: socket.id,
             serverIndex: assignedIndex,
             name,
-            horseColor: horseColor
+            horseColor: randomColor
         };
 
         socket.emit('currentPlayers', players);
@@ -199,6 +194,10 @@ io.on('connection', (socket) => {
         gameState.status = 'LOBBY';
         Object.values(players).forEach(p => p.x = 150);
         io.emit('raceReset', players);
+    });
+
+    socket.on('requestSync', () => {
+        socket.emit('currentPlayers', players);
     });
 });
 
