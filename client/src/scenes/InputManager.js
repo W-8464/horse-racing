@@ -28,6 +28,9 @@ export default class InputManager {
         this.players.moveSelfBy(20);
         this.network.emitMovement(this.players.horse.x);
 
+        if (this.players.horse.requestRun) this.players.horse.requestRun(1);
+        else if (this.players.horse.playRun) this.players.horse.playRun();
+
         this.flashSkill.registerNormalClick();
     }
 }

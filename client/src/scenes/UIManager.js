@@ -51,6 +51,8 @@ export default class UIManager {
 
         this._ratioInputY = 0.45;
         this._ratioCountdownY = 0.35;
+
+        this.hostLeaderboardDom = null;
     }
 
     _getLayout() {
@@ -61,8 +63,6 @@ export default class UIManager {
 
         const baseW = GAME_SETTINGS.DESIGN_WIDTH;
         const baseH = GAME_SETTINGS.DESIGN_HEIGHT;
-
-        // scale UI nhẹ theo viewport (để màn nhỏ không bị tràn)
         const s = Phaser.Math.Clamp(Math.min(w / baseW, h / baseH), 0.65, 1.2);
 
         return { w, h, cx, cy, s };
@@ -94,6 +94,21 @@ export default class UIManager {
         if (this.countdownText) {
             this.countdownText.setPosition(cx, countdownY);
             this.countdownText.setFontSize(Math.round(96 * clampedScale));
+        }
+
+        if (this.hostLeaderboardDom) {
+            const barScale = Phaser.Math.Clamp(clampedScale, 0.75, 1);
+            const barH = Math.max(44, Math.round(60 * barScale));
+            const y = h - Math.round(barH / 2);
+
+            this.hostLeaderboardDom.setPosition(w / 2, y);
+            this.hostLeaderboardDom.setDepth(DEPTH.UI + 50);
+
+            const el = this.hostLeaderboardDom.getChildByID('host-leaderboard');
+            if (el) {
+                el.style.width = `${w}px`;
+                el.style.height = `${barH}px`;
+            }
         }
 
         if (this.winnerOverlay) {
@@ -284,7 +299,6 @@ export default class UIManager {
 
     startCountdown() {
         this.state.isCountdownRunning = true;
-
         let timeLeft = GAME_SETTINGS.COUNTDOWN_TIME;
 
         if (this.countdownText) {
@@ -310,7 +324,6 @@ export default class UIManager {
             repeat: timeLeft,
             callback: () => {
                 timeLeft--;
-
                 if (timeLeft > 0) {
                     txt.setText(timeLeft.toString());
                     return;
@@ -326,6 +339,80 @@ export default class UIManager {
                         this.countdownText = null;
                     }
                 });
+            }
+        });
+    }
+
+    showHostLeaderboard() {
+        if (this.state.role !== 'host' || this.hostLeaderboardDom) return;
+        const { w } = this._getLayout();
+
+        this.hostLeaderboardDom = this.scene.add.dom(w / 2, this.scene.scale.height - 40).createFromHTML(`
+        <div id="host-leaderboard" style="
+            position: relative;
+            display: flex;
+            gap: 10px;
+            padding: 5px 20px;
+            background: rgba(0, 59, 31, 0.8);
+            border-top: 3px solid #5dfc9b;
+            width: 100vw;
+            height: 60px;
+            align-items: center;
+            overflow: hidden;
+            justify-content: center;
+            pointer-events: none;
+            box-sizing: border-box;
+        ">
+        </div>
+    `).setScrollFactor(0).setDepth(DEPTH.UI);
+    }
+
+    updateHostLeaderboard(sortedPlayers) {
+        if (!this.hostLeaderboardDom) return;
+
+        const container = this.hostLeaderboardDom.getChildByID('host-leaderboard');
+        const currentItems = Array.from(container.children);
+
+        const top10 = sortedPlayers.slice(0, 10);
+
+        top10.forEach((player, index) => {
+            let el = container.querySelector(`[data-id="${player.id}"]`);
+
+            if (!el) {
+                el = document.createElement('div');
+                el.setAttribute('data-id', player.id);
+                el.style.cssText = `
+                transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                background: #111;
+                border: 2px solid ${player.horseColor || '#5dfc9b'};
+                color: white;
+                padding: 4px 10px;
+                font-family: monospace;
+                font-size: 14px;
+                white-space: nowrap;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                position: absolute;
+                left: 0;
+            `;
+                container.appendChild(el);
+            }
+
+            const itemWidth = 140;
+            const spacing = 10;
+            const targetX = (index * (itemWidth + spacing));
+
+            el.style.transform = `translateX(${targetX}px)`;
+            el.innerHTML = `<span style="color:#5dfc9b">#${index + 1}</span> ${player.name.substring(0, 8)}`;
+            el.style.zIndex = 10 - index;
+        });
+
+        currentItems.forEach(item => {
+            const id = item.getAttribute('data-id');
+            if (!top10.find(p => p.id === id)) {
+                item.style.opacity = '0';
+                setTimeout(() => item.remove(), 500);
             }
         });
     }

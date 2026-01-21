@@ -3,26 +3,15 @@ import { DEPTH, GAME_SETTINGS } from '../config/config.js';
 export default class EnvironmentManager {
     constructor(scene) {
         this.scene = scene;
-
         this.worldWidth = GAME_SETTINGS.WORLD_WIDTH;
-
-        // Giữ logic/physics cũ ổn định theo baseHeight
         this.baseHeight = GAME_SETTINGS.DESIGN_HEIGHT;
-
-        // Giữ skyHeight cố định (tránh phá layout/physics cũ)
         this.skyHeight = 110;
-
-        // WorldHeight có thể nở theo viewport height (RESIZE)
         this.worldHeight = this.baseHeight;
-
-        // refs để resize/update
         this.grass = null;
         this.sky = null;
         this.mist = null;
-
         this._cloudsCreated = false;
         this._lanternsCreated = false;
-
         this._checkLineXs = [];
         this._checkLineGraphics = [];
     }
@@ -30,24 +19,28 @@ export default class EnvironmentManager {
     createPixelTextures() {
         // ✅ Guard tránh tạo lại
         if (!this.scene.textures.exists('grassPixel')) {
-            const grassCanvas = this.scene.textures.createCanvas('grassPixel', 64, 64);
+            const grassCanvas = this.scene.textures.createCanvas('grassPixel', 64, 128);
             const ctx = grassCanvas.context;
-            ctx.fillStyle = '#73bd4d';
-            ctx.fillRect(0, 0, 64, 64);
-            const colors = ['#7bc655', '#6ab344', '#5da139', '#82c35e'];
+            const grd = ctx.createLinearGradient(0, 0, 0, 128);
+            grd.addColorStop(0, '#5da139');
+            grd.addColorStop(1, '#73bd4d');
 
-            for (let i = 0; i < 150; i++) {
+            ctx.fillStyle = grd;
+            ctx.fillRect(0, 0, 64, 128);
+
+            const colors = ['#7bc655', '#6ab344', '#82c35e'];
+            for (let i = 0; i < 200; i++) {
                 ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
-                const x = Math.floor(Math.random() * 16) * 4;
-                const y = Math.floor(Math.random() * 16) * 4;
-                const size = Math.random() > 0.5 ? 4 : 8;
+                const x = Math.floor(Math.random() * 64);
+                const y = Math.floor(Math.random() * 128);
+                const size = y > 64 ? 3 : 1;
                 ctx.fillRect(x, y, size, size);
             }
             grassCanvas.refresh();
         }
 
         if (!this.scene.textures.exists('cloudPixel')) {
-            const cloudCanvas = this.scene.textures.createCanvas('cloudPixel', 48, 24); // Nhỏ hơn xíu
+            const cloudCanvas = this.scene.textures.createCanvas('cloudPixel', 48, 24);
             const cCtx = cloudCanvas.context;
             cCtx.fillStyle = '#ffffff';
             cCtx.fillRect(12, 0, 24, 12);
@@ -65,7 +58,6 @@ export default class EnvironmentManager {
         this.scene.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
         this.scene.physics.world.setBounds(0, this.skyHeight, this.worldWidth, this.worldHeight - this.skyHeight);
 
-        // Trời (vẽ 1 lần)
         if (!this.sky) {
             const sky = this.scene.add.graphics();
             sky.fillGradientStyle(0x87CEEB, 0x87CEEB, 0xbfe9ff, 0xbfe9ff, 1);
@@ -73,18 +65,16 @@ export default class EnvironmentManager {
             this.sky = sky;
         }
 
-        // Mây (tạo 1 lần)
         if (!this._cloudsCreated) {
             for (let i = 0; i < this.worldWidth; i += 300) {
                 this.scene.add.image(i, 20 + Math.random() * 40, 'cloudPixel')
-                    .setScale(1.5 + Math.random()) // Scale nhỏ hơn
+                    .setScale(1.5 + Math.random())
                     .setAlpha(0.5)
-                    .setScrollFactor(0.15); // Parallax chậm hơn tạo độ sâu
+                    .setScrollFactor(0.15);
             }
             this._cloudsCreated = true;
         }
 
-        // Cỏ (update được chiều cao khi resize)
         if (!this.grass) {
             this.grass = this.scene.add.tileSprite(
                 0,
@@ -99,18 +89,16 @@ export default class EnvironmentManager {
             this._resizeGrass();
         }
 
-        // Đèn lồng (tạo 1 lần)
         if (!this._lanternsCreated) {
             for (let x = 0; x < this.worldWidth; x += 350) {
                 this.scene.add.image(x, -20, 'lantern')
                     .setOrigin(0.5, 0)
-                    .setScale(0.35) // Scale nhỏ hơn cho 430px height
+                    .setScale(0.35)
                     .setDepth(DEPTH.LANTERN);
             }
             this._lanternsCreated = true;
         }
 
-        // Núi + sương (tạo 1 lần)
         if (!this.mist) {
             this.drawMountains(this.worldWidth, this.skyHeight);
             this.mist = this.drawHorizonMist(this.worldWidth);
@@ -143,7 +131,7 @@ export default class EnvironmentManager {
         graphics.fillStyle(0x5a7e91, 0.6);
 
         for (let x = 0; x < worldWidth; x += 140) {
-            const mHeight = 30 + Math.random() * 40; // Giảm chiều cao núi
+            const mHeight = 30 + Math.random() * 40;
             const mWidth = 100 + Math.random() * 60;
 
             for (let py = 0; py < mHeight; py += pixelSize) {
@@ -161,9 +149,9 @@ export default class EnvironmentManager {
 
     drawHorizonMist(worldWidth) {
         const mist = this.scene.add.graphics();
-        mist.fillGradientStyle(0x87CEEB, 0x87CEEB, 0x73bd4d, 0x73bd4d, 0, 0, 0.8, 0.8);
-        mist.fillRect(0, this.skyHeight - 20, worldWidth, 40);
-        mist.setDepth(DEPTH.GRASS - 0.5).setScrollFactor(1);
+        mist.fillGradientStyle(0x87CEEB, 0x87CEEB, 0x73bd4d, 0x73bd4d, 0.8, 0.8, 0, 0);
+        mist.fillRect(0, this.skyHeight, worldWidth, 80);
+        mist.setDepth(DEPTH.GRASS + 0.1).setScrollFactor(1);
         return mist;
     }
 
@@ -176,19 +164,34 @@ export default class EnvironmentManager {
     }
 
     _createCheckeredLineGraphics(xPosition) {
-        const tileSize = 30;
-        const cols = 2;
         const graphics = this.scene.add.graphics();
+        const groundHeight = this.worldHeight - this.skyHeight;
+        const baseTileHeight = 8; // Bắt đầu với ô rất dẹt ở phía xa
 
-        graphics.fillStyle(0x000000, 0.2);
-        graphics.fillRect(xPosition + (cols * tileSize), this.skyHeight, 10, this.worldHeight - this.skyHeight);
+        let currentY = this.skyHeight;
+        let i = 0;
 
-        for (let y = this.skyHeight; y < this.worldHeight; y += tileSize) {
-            for (let x = 0; x < cols; x++) {
-                const isWhite = ((x + Math.floor((y - this.skyHeight) / tileSize))) % 2 === 0;
+        while (currentY < this.worldHeight) {
+            const progress = (currentY - this.skyHeight) / groundHeight;
+            const dynamicHeight = Phaser.Math.Linear(8, 40, progress);
+            const dynamicWidth = Phaser.Math.Linear(20, 80, progress);
+
+            for (let col = 0; col < 2; col++) {
+                const isWhite = (i + col) % 2 === 0;
                 graphics.fillStyle(isWhite ? 0xffffff : 0x333333, 1);
-                graphics.fillRect(xPosition + (x * tileSize), y, tileSize, tileSize);
+
+                const xOffset = col * dynamicWidth - (dynamicWidth);
+
+                graphics.fillRect(
+                    xPosition + xOffset,
+                    currentY,
+                    dynamicWidth,
+                    dynamicHeight
+                );
             }
+
+            currentY += dynamicHeight;
+            i++;
         }
 
         graphics.setDepth(DEPTH.CHECK_LINE);

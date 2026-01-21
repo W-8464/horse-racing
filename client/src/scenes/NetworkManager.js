@@ -40,7 +40,7 @@ export default class NetworkManager {
 
         const rejoin = () => {
             if (this.state.role === 'player' && this.playerName) {
-                this.socket.emit('selectRole', { role: 'player', name: this.playerName });
+                this.socket.emit('selectRole', { role: 'player', name: this.playerName, color: this.playerColor });
             }
             if (this.state.role === 'host' && this.ui.cachedHostPassword) {
                 this.socket.emit('selectRole', { role: 'host', password: this.ui.cachedHostPassword });
@@ -71,6 +71,12 @@ export default class NetworkManager {
         });
 
         this.socket.on('raceReset', (players) => {
+            if (!this.scene.state.sounds.bgm.isPlaying) {
+                this.scene.state.sounds.bgm.play();
+            }
+            this.scene.state.sounds.gallop.stop();
+            this.scene.state.sounds.audience.stop();
+
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
 
@@ -93,6 +99,7 @@ export default class NetworkManager {
         this.socket.on('hostAccepted', () => {
             if (this.state.role !== 'host') return;
             this.ui.destroyHostPasswordInput();
+            this.ui.showHostLeaderboard();
             this.ui.showStartButton(() => this.hostStartGame());
         });
 
@@ -104,20 +111,39 @@ export default class NetworkManager {
         });
 
         this.socket.on('startCountdown', () => {
+            if (this.scene.state.sounds.bgm.isPlaying) this.scene.state.sounds.bgm.stop();
+            this.scene.state.sounds.countdown.play();
+            this.scene.state.sounds.audience.play();
+
             this.ui.clearBeforeCountdown();
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
 
             this.ui.startCountdown();
+
+            this.scene.time.delayedCall(3000, () => {
+                if (!this.scene.state.sounds.gallop.isPlaying) {
+                    this.scene.state.sounds.gallop.play();
+                }
+            });
         });
 
         this.socket.on('youFinished', (data) => {
             this.ui.showLocalFinishRank(data.rank);
+            this.scene.state.sounds.finish.play();
+            this.scene.state.sounds.gallop.stop();
         });
 
         this.socket.on('raceFinished', (data) => {
             this.state.isRaceStarted = false;
             this.state.isFinished = true;
+
+            this.scene.state.sounds.audience.stop();
+            this.scene.state.sounds.gallop.stop();
+            if (!this.scene.state.sounds.bgm.isPlaying) {
+                this.scene.state.sounds.bgm.play();
+            }
+
             if (this.state.role === 'host') {
                 this.ui.showWinnerBanner(data);
             }
@@ -175,7 +201,8 @@ export default class NetworkManager {
     // emits
     selectRolePlayer(name) {
         this.playerName = name;
-        this.socket.emit('selectRole', { role: 'player', name });
+        this.playerColor = Math.random() * 0xffffff;
+        this.socket.emit('selectRole', { role: 'player', name, color: this.playerColor });
     }
 
     selectRoleHost(password) {

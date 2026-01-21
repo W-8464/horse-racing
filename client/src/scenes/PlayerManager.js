@@ -36,7 +36,8 @@ export default class PlayerManager {
         );
 
         this.horse.setDepth(DEPTH.HORSE);
-        this.horse.play('horse_run');
+        if (this.horse.playIdle) this.horse.playIdle();
+        else this.horse.play('horse_idle');
         this.scene.cameras.main.startFollow(this.horse, true, 0.1, 0.1);
     }
 
@@ -62,7 +63,8 @@ export default class PlayerManager {
 
         other.serverIndex = playerInfo.serverIndex;
         other.setDepth(DEPTH.HORSE);
-        other.play('horse_run');
+        if (other.playIdle) other.playIdle();
+        else other.play('horse_idle');
         this.otherPlayers.add(other);
     }
 
@@ -93,7 +95,8 @@ export default class PlayerManager {
                 const newX = x0 + (x1 - x0) * interpolationFactor;
                 if (Math.abs(horse.x - newX) > 0.1) {
                     horse.x = newX;
-                    if (horse.playRun) horse.playRun();
+                    if (horse.requestRun) horse.requestRun(1);
+                    else if (horse.playRun) horse.playRun();
                 }
             }
         });
@@ -128,7 +131,8 @@ export default class PlayerManager {
     moveSelfBy(dx) {
         if (!this.horse) return;
         this.horse.x += dx;
-        if (this.horse.playRun) this.horse.playRun();
+        if (this.horse.requestRun) this.horse.requestRun(1);
+        else if (this.horse.playRun) this.horse.playRun();
     }
 
     getLeaderFromOthers() {

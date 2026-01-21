@@ -29,9 +29,7 @@ const availableIndexes = [];
 setInterval(() => {
     const ids = Object.keys(players);
     if (ids.length > 0) {
-        // Mỗi người chơi cần 4 bytes cho tọa độ X (Float32)
         const buffer = new Float32Array(ids.length * 2);
-        // Cấu trúc: [index_nguoi_choi_1, x_1, index_nguoi_choi_2, x_2, ...]
 
         ids.forEach((id, i) => {
             const idx = playerIndexMap.get(id);
@@ -39,7 +37,6 @@ setInterval(() => {
             buffer[i * 2 + 1] = players[id].x;
         });
 
-        // Gửi Buffer thay vì JSON object
         io.emit('gameStateUpdate', {
             b: buffer,
             ts: Date.now()
@@ -51,7 +48,7 @@ io.on('connection', (socket) => {
     console.log('Người chơi mới:', socket.id);
 
     socket.on('selectRole', (data) => {
-        const { role, name, password } = data;
+        const { role, name, password, color } = data;
         socket.role = role;
 
         if (role === 'host') {
@@ -67,14 +64,7 @@ io.on('connection', (socket) => {
             return;
         }
 
-        let horseColor;
-        if (existingPlayer) {
-            horseColor = existingPlayer.horseColor;
-            delete players[existingPlayer.id];
-        } else {
-            horseColor = Math.random() * 0xffffff;
-        }
-
+        const horseColor = color || (Math.random() * 0xffffff);
         const skyHeight = 110;
         const padding = 30;
 
@@ -88,7 +78,7 @@ io.on('connection', (socket) => {
         playerIndexMap.set(socket.id, assignedIndex);
 
         players[socket.id] = {
-            x: existingPlayer ? existingPlayer.x : 100,
+            x: 100,
             y: skyHeight + padding + ((Object.keys(players).length % 6) * 45),
             id: socket.id,
             serverIndex: assignedIndex,
@@ -119,11 +109,8 @@ io.on('connection', (socket) => {
 
     socket.on('playerMovement', (data) => {
         if (socket.role !== 'player' || gameState.status !== 'RUNNING') return;
-
         const player = players[socket.id];
         if (!player) return;
-
-        // Nếu người chơi đã có trong danh sách về đích, không cho di chuyển tiếp (tùy chọn)
         const alreadyFinished = finishedPlayers.find(p => p.id === socket.id);
         if (alreadyFinished) return;
 
@@ -137,7 +124,6 @@ io.on('connection', (socket) => {
                 finishTime: finishTime
             });
 
-            // Gửi thông báo riêng cho người vừa về đích (để client dừng input/hiện hiệu ứng)
             socket.emit('youFinished', { rank: finishedPlayers.length });
 
             const totalPlayers = Object.keys(players).length;
@@ -170,9 +156,7 @@ io.on('connection', (socket) => {
         const indexToFree = playerIndexMap.get(socket.id);
 
         if (indexToFree !== undefined) {
-            // Đưa index vào danh sách chờ cấp phát lại
             availableIndexes.push(indexToFree);
-            // Sắp xếp lại để ưu tiên cấp index nhỏ trước (giúp mảng binary ngắn nhất có thể)
             availableIndexes.sort((a, b) => a - b);
         }
 
@@ -181,14 +165,11 @@ io.on('connection', (socket) => {
         io.emit('playerDisconnected', socket.id);
     });
 
-    // Host bấm "PLAY AGAIN" -> ép tất cả client reload trang
     socket.on('hostRestartGame', () => {
         if (socket.id !== gameState.hostId) return;
 
         finishedPlayers = [];
         gameState.status = 'LOBBY';
-
-        // reset vị trí (phòng trường hợp có ai không reload kịp)
         Object.values(players).forEach(p => p.x = 100);
 
         io.emit('raceReset', players);

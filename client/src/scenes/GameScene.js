@@ -17,6 +17,7 @@ export default class GameScene extends Phaser.Scene {
             isFinished: false,
             isRaceStarted: false,
             isCountdownRunning: false,
+            sounds: {}
         };
 
         this.env = null;
@@ -28,13 +29,31 @@ export default class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.spritesheet('horse', 'assets/images/horse-temp/28.png', {
-            frameWidth: 403.5,
-            frameHeight: 320
+        // this.load.spritesheet('horse', 'assets/images/horse-temp/28.png', {
+        //     frameWidth: 403.5,
+        //     frameHeight: 320
+        // });
+
+        this.load.spritesheet('horse', 'assets/images/horse-run.png', {
+            frameWidth: 384,
+            frameHeight: 270
+        });
+
+        this.load.spritesheet('idle', 'assets/images/horse-idle.png', {
+            frameWidth: 384,
+            frameHeight: 270
         });
 
         this.load.image('lantern', 'assets/images/light.png');
         this.load.image('flash_icon', 'assets/images/flash.png');
+
+        // Nhạc nền (BGM)
+        this.load.audio('bgm', 'assets/sounds/background_music.mp3');
+        // Hiệu ứng âm thanh (SFX)
+        this.load.audio('countdown_full', 'assets/sounds/countdown.mp3');
+        this.load.audio('gallop', 'assets/sounds/gallop.mp3');
+        this.load.audio('audience', 'assets/sounds/audience.mp3');
+        this.load.audio('finish_sound', 'assets/sounds/win.mp3');
     }
 
     create() {
@@ -47,6 +66,15 @@ export default class GameScene extends Phaser.Scene {
 
         this.env.drawCheckeredLine(GAME_SETTINGS.START_LINE_X);
         this.env.drawCheckeredLine(GAME_SETTINGS.FINISH_LINE_X);
+
+        // sounds
+        this.state.sounds.bgm = this.sound.add('bgm', { loop: true, volume: 0.5 });
+        this.state.sounds.countdown = this.sound.add('countdown_full');
+        this.state.sounds.gallop = this.sound.add('gallop', { loop: true });
+        this.state.sounds.audience = this.sound.add('audience', { loop: true });
+        this.state.sounds.finish = this.sound.add('finish_sound');
+
+        this.state.sounds.bgm.play();
 
         // anims
         this.createAnimations();
@@ -136,10 +164,26 @@ export default class GameScene extends Phaser.Scene {
     }
 
     createAnimations() {
+        // if (!this.anims.exists('horse_run')) {
+        //     this.anims.create({
+        //         key: 'horse_run',
+        //         frames: this.anims.generateFrameNumbers('horse', { start: 4, end: 7 }),
+        //         frameRate: 6,
+        //         repeat: -1
+        //     });
+        // }
         if (!this.anims.exists('horse_run')) {
             this.anims.create({
                 key: 'horse_run',
-                frames: this.anims.generateFrameNumbers('horse', { start: 4, end: 7 }),
+                frames: this.anims.generateFrameNumbers('horse', { start: 0, end: 5 }),
+                frameRate: 10,
+                repeat: 0
+            });
+        }
+        if (!this.anims.exists('horse_idle')) {
+            this.anims.create({
+                key: 'horse_idle',
+                frames: this.anims.generateFrameNumbers('idle', { start: 0, end: 3 }),
                 frameRate: 6,
                 repeat: -1
             });
@@ -175,9 +219,29 @@ export default class GameScene extends Phaser.Scene {
         );
     }
 
-    update() {
+    update(time) {
         if (this.players && this.network) {
             this.players.updateAllPositions(this.network);
+
+            if (this.state.role === 'host' && !this.state.isFinished) {
+                if (!this.lastLeaderboardUpdate || time - this.lastLeaderboardUpdate > 200) {
+
+                    const allHorses = [...this.players.otherPlayers.getChildren()];
+                    if (this.players.horse) allHorses.push(this.players.horse);
+
+                    const sortedData = allHorses.map(h => ({
+                        id: h.playerId,
+                        name: h.playerName || 'Guest',
+                        x: h.x,
+                        horseColor: h.baseColor
+                    }));
+
+                    sortedData.sort((a, b) => b.x - a.x);
+
+                    this.ui.updateHostLeaderboard(sortedData);
+                    this.lastLeaderboardUpdate = time;
+                }
+            }
         }
         this.players?.updateHostCameraFollow();
     }
