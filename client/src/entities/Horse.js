@@ -6,9 +6,16 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
         this.textureKey = texture;
         this.playerId = id;
         this.baseColor = color;
+        this.playerName = name;
+
+        this._runAnimKey = `${this.textureKey}_run`;
+        this._idleAnimKey = `${this.textureKey}_idle`;
+        this._runQueue = 0;
+        this._isRunPlaying = false;
+
         scene.add.existing(this);
         scene.physics.add.existing(this);
-        this.setScale(0.2);
+        this.setScale(0.36);
         this.setCollideWorldBounds(true);
         this.setTint(this.baseColor);
         this.setDepth(DEPTH.HORSE);
@@ -27,6 +34,18 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
         )
             .setOrigin(0.5)
             .setDepth(DEPTH.UI);
+
+        this._onAnimComplete = (anim) => {
+            const key = anim?.key;
+            if (key !== this._runAnimKey && key !== 'horse_run') return;
+
+            this._isRunPlaying = false;
+
+            if (this._runQueue > 0) this._playNextRun();
+            else this.playIdle();
+        };
+
+        this.on(Phaser.Animations.Events.ANIMATION_COMPLETE, this._onAnimComplete);
     }
 
     preUpdate(time, delta) {
@@ -37,6 +56,9 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
     }
 
     destroy(fromScene) {
+        this.off(Phaser.Animations.Events.ANIMATION_COMPLETE, this._onAnimComplete);
+        this._onAnimComplete = null;
+
         if (this.nameText) {
             this.nameText.destroy();
             this.nameText = null;
@@ -44,10 +66,51 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
         super.destroy(fromScene);
     }
 
+    requestRun(cap = 1) {
+        const safeCap = Math.max(0, cap | 0);
+        if (safeCap === 0) return;
+
+        this._runQueue = Math.min(this._runQueue + 1, safeCap);
+        if (!this._isRunPlaying) this._playNextRun();
+    }
+
+    _playNextRun() {
+        if (this._runQueue <= 0) {
+            this._isRunPlaying = false;
+            this.playIdle();
+            return;
+        }
+
+        this._runQueue--;
+        this._isRunPlaying = true;
+
+        const key = this.scene?.anims?.exists(this._runAnimKey)
+            ? this._runAnimKey
+            : this.scene?.anims?.exists('horse_run')
+                ? 'horse_run'
+                : null;
+
+        if (!key) return;
+
+        this.play(key, true);
+    }
+
+    playIdle() {
+        const key = this.scene?.anims?.exists(this._idleAnimKey)
+            ? this._idleAnimKey
+            : this.scene?.anims?.exists('horse_idle')
+                ? 'horse_idle'
+                : null;
+
+        if (!key) return;
+
+        this._isRunPlaying = false;
+        this._runQueue = 0;
+        this.play(key, true);
+    }
+
     playRun() {
-        const key = `${this.textureKey}_run`;
-        if (this.scene.anims.exists(key)) this.play(key, true);
-        else if (this.scene.anims.exists('horse_run')) this.play('horse_run', true);
+        this.requestRun(1);
     }
 
     resetColor() {
