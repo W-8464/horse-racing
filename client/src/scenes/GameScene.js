@@ -29,10 +29,33 @@ export default class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        // this.load.spritesheet('horse', 'assets/images/horse-temp/28.png', {
-        //     frameWidth: 403.5,
-        //     frameHeight: 320
-        // });
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+
+        const loadingText = this.make.text({
+            x: width / 2,
+            y: height / 2 - 50,
+            text: 'Loading...',
+            style: { font: '20px Arial', fill: '#ffffff' }
+        }).setOrigin(0.5, 0.5);
+
+        const progressBox = this.add.graphics();
+        progressBox.fillStyle(0x222222, 0.8);
+        progressBox.fillRect(width / 2 - 160, height / 2, 320, 50);
+
+        const progressBar = this.add.graphics();
+
+        this.load.on('progress', (value) => {
+            progressBar.clear();
+            progressBar.fillStyle(0x3498db, 1);
+            progressBar.fillRect(width / 2 - 150, height / 2 + 10, 300 * value, 30);
+        });
+
+        this.load.on('complete', () => {
+            progressBar.destroy();
+            progressBox.destroy();
+            loadingText.destroy();
+        });
 
         this.load.spritesheet('horse', 'assets/images/horse-run.png', {
             frameWidth: 384,

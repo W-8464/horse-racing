@@ -3,6 +3,7 @@ import GameScene from './scenes/GameScene.js';
 
 const gameConfig = {
     ...config,
+    backgroundColor: '#222222',
     scene: [GameScene]
 };
 
