@@ -18,7 +18,7 @@ let gameState = {
 };
 let startTime = 0;
 let finishedPlayers = [];
-const FINISH_LINE_X = 500;
+const FINISH_LINE_X = 5400;
 const COUNTDOWN_TIME = 3;
 
 const TICK_RATE = 10;

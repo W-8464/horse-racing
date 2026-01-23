@@ -26,7 +26,7 @@ export const GAME_SETTINGS = {
     DESIGN_HEIGHT: 430,
 
     START_LINE_X: 100, // Thu hẹp lề một chút
-    FINISH_LINE_X: 500, // Kéo dài đường đua để tận dụng màn hình ngang
+    FINISH_LINE_X: 5400, // Kéo dài đường đua để tận dụng màn hình ngang
     WORLD_WIDTH: 5500,
 
     COUNTDOWN_TIME: 3,
