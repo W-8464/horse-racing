@@ -24,7 +24,7 @@ export default class FlashSkillManager {
         // if (this.clickCount >= 10 && !this.flashButton) {
         //     this.createFlashButton();
         // }
-        if (this.clickCount >= 10) {
+        if (this.clickCount >= 20) {
             this.useFlashSkill();
         }
     }

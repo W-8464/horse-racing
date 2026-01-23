@@ -18,7 +18,7 @@ let gameState = {
 };
 let startTime = 0;
 let finishedPlayers = [];
-const FINISH_LINE_X = 5000;
+const FINISH_LINE_X = 500;
 const COUNTDOWN_TIME = 3;
 
 const TICK_RATE = 10;
@@ -132,6 +132,7 @@ io.on('connection', (socket) => {
             if (finishedPlayers.length >= limit) {
                 gameState.status = 'FINISHED';
                 const top10 = finishedPlayers.map((p, index) => ({
+                    id: p.id,
                     rank: index + 1,
                     name: p.name,
                     finishTime: p.finishTime

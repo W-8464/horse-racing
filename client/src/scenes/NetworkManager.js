@@ -80,6 +80,8 @@ export default class NetworkManager {
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
 
+            this.scene.state.finishedPlayers = [];
+
             this.players.resetPositionsFromServer(players, this.socket.id);
 
             // UI theo role
@@ -135,6 +137,7 @@ export default class NetworkManager {
         });
 
         this.socket.on('raceFinished', (data) => {
+            this.scene.state.finishedPlayers = data.top10;
             this.state.isRaceStarted = false;
             this.state.isFinished = true;
 
@@ -145,7 +148,7 @@ export default class NetworkManager {
             }
 
             if (this.state.role === 'host') {
-                this.ui.showWinnerBanner(data);
+                this.ui.updateHostLeaderboard(data.top10, data.top10);
             }
         });
 

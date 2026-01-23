@@ -29,6 +29,33 @@ const PIXEL_BTN_STYLE = `
   transition: all 0.1s;
 `;
 
+const LEADERBOARD_CONTAINER_STYLE = `
+    background: rgba(0, 59, 31, 0.85);
+    border: 4px solid #5dfc9b;
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    min-width: 280px;
+    pointer-events: auto;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    max-height: 400px;
+    overflow-y: auto;
+`;
+
+const REFRESH_BTN_STYLE = `
+    background: none;
+    border: none;
+    color: #ffeb3b;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 0;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    transition: transform 0.1s;
+    position: absolute;
+    right: 24px;
+`;
+
 export default class UIManager {
     constructor(scene, state) {
         this.scene = scene;
@@ -97,18 +124,10 @@ export default class UIManager {
         }
 
         if (this.hostLeaderboardDom) {
-            const barScale = Phaser.Math.Clamp(clampedScale, 0.75, 1);
-            const barH = Math.max(44, Math.round(60 * barScale));
-            const y = h - Math.round(barH / 2);
-
-            this.hostLeaderboardDom.setPosition(w / 2, y);
-            this.hostLeaderboardDom.setDepth(DEPTH.UI + 50);
-
-            const el = this.hostLeaderboardDom.getChildByID('host-leaderboard');
-            if (el) {
-                el.style.width = `${w}px`;
-                el.style.height = `${barH}px`;
-            }
+            // Thay vì setPosition theo tâm màn hình, ta để CSS top/right lo việc này
+            // Hoặc nếu muốn dùng setPosition của Phaser:
+            this.hostLeaderboardDom.setPosition(w - 20, 20);
+            this.hostLeaderboardDom.setOrigin(1, 0); // Gốc tọa độ tại góc trên bên phải của DOM
         }
 
         if (this.winnerOverlay) {
@@ -344,91 +363,62 @@ export default class UIManager {
     }
 
     showHostLeaderboard() {
-        if (this.state.role !== 'host' || this.hostLeaderboardDom) return;
-        const { w } = this._getLayout();
+        if (this.hostLeaderboardDom) return;
 
-        this.hostLeaderboardDom = this.scene.add.dom(w / 2, this.scene.scale.height - 40).createFromHTML(`
-        <div id="host-leaderboard" style="
-            position: relative;
-            display: flex;
-            gap: 10px;
-            padding: 5px 20px;
-            background: rgba(0, 59, 31, 0.8);
-            border-top: 3px solid #5dfc9b;
-            width: 100vw;
-            height: 60px;
-            align-items: center;
-            overflow: hidden;
-            justify-content: center;
-            pointer-events: none;
-            box-sizing: border-box;
-        ">
+        this.hostLeaderboardDom = this.scene.add.dom(0, 0).createFromHTML(`
+    <div id="unified-leaderboard" style="${LEADERBOARD_CONTAINER_STYLE}">
+        <div style="display: flex; justify-content: center; align-items: center; border-bottom: 2px solid #ffeb3b; margin-bottom: 10px; padding-bottom: 5px;">
+            <h2 style="color:#ffeb3b; margin:0; font-size:18px; font-family: 'Courier New', monospace;">
+                LEADERBOARD
+            </h2>
+            <button id="restartBtn" style="${REFRESH_BTN_STYLE}" title="Reset Race">
+                ↻
+            </button>
         </div>
-    `).setScrollFactor(0).setDepth(DEPTH.UI);
+        <div id="leaderboard-list"></div>
+    </div>
+    `).setScrollFactor(0).setDepth(DEPTH.UI + 10);
+
+        this.hostLeaderboardDom.addListener('click');
+        this.hostLeaderboardDom.on('click', (e) => {
+            if (e.target.id === 'restartBtn') {
+                e.target.style.transform = 'rotate(180deg)';
+                setTimeout(() => { e.target.style.transform = 'rotate(0deg)'; }, 200);
+
+                this.scene.events.emit('restartRequested');
+            }
+        });
+
+        this.layout();
     }
 
     updateHostLeaderboard(sortedPlayers) {
         if (!this.hostLeaderboardDom) return;
 
-        const container = this.hostLeaderboardDom.getChildByID('host-leaderboard');
-        const currentItems = Array.from(container.children);
+        const listContainer = this.hostLeaderboardDom.getChildByID('leaderboard-list');
+        if (!listContainer) return;
 
+        const finishedData = this.state.finishedPlayers || [];
         const top10 = sortedPlayers.slice(0, 10);
 
-        top10.forEach((player, index) => {
-            let el = container.querySelector(`[data-id="${player.id}"]`);
+        listContainer.innerHTML = top10.map((player, index) => {
+            const finishEntry = finishedData.find(f => f.id === player.id);
+            const timeText = finishEntry ? `<span style="color:#ffeb3b; font-size:12px;">${finishEntry.finishTime}s</span>` : '';
+            const isFirst = index === 0;
 
-            if (!el) {
-                el = document.createElement('div');
-                el.setAttribute('data-id', player.id);
-                el.style.cssText = `
-                transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-                background: #111;
-                border: 2px solid ${player.horseColor || '#5dfc9b'};
-                color: white;
-                padding: 4px 10px;
-                font-family: monospace;
-                font-size: 14px;
-                white-space: nowrap;
-                display: flex;
-                align-items: center;
-                gap: 5px;
-                position: absolute;
-                left: 0;
-            `;
-                container.appendChild(el);
-            }
-
-            const itemWidth = 140;
-            const spacing = 10;
-            const targetX = (index * (itemWidth + spacing));
-
-            el.style.transform = `translateX(${targetX}px)`;
-            el.innerHTML = `<span style="color:#5dfc9b">#${index + 1}</span> ${player.name.substring(0, 8)}`;
-            el.style.zIndex = 10 - index;
-        });
-
-        currentItems.forEach(item => {
-            const id = item.getAttribute('data-id');
-            if (!top10.find(p => p.id === id)) {
-                item.style.opacity = '0';
-                setTimeout(() => item.remove(), 500);
-            }
-        });
+            return `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 14px; color: ${isFirst ? '#ffeb3b' : '#5dfc9b'}">
+                <span>#${index + 1} ${player.name.substring(0, 8)}</span>
+                ${timeText}
+            </div>
+        `;
+        }).join('');
     }
 
     destroyWinner() {
         if (this.finishRankText) {
             this.finishRankText.destroy();
             this.finishRankText = null;
-        }
-        if (this.winnerContainer) {
-            this.winnerContainer.destroy();
-            this.winnerContainer = null;
-        }
-        if (this.winnerOverlay) {
-            this.winnerOverlay.destroy();
-            this.winnerOverlay = null;
         }
     }
 
@@ -447,92 +437,5 @@ export default class UIManager {
                 align: 'center',
             }
         ).setOrigin(0.5).setDepth(DEPTH.UI).setScrollFactor(0);
-    }
-
-    showWinnerBanner(data) {
-        const { top10 } = data;
-        const { w, h, cx, cy } = this._getLayout();
-
-        const isHost = this.state.role === 'host';
-
-        this.destroyWinner();
-
-        this.winnerOverlay = this.scene.add.rectangle(
-            cx, cy,
-            w, h,
-            0x000000, 0.8
-        ).setScrollFactor(0).setDepth(DEPTH.UI);
-
-        const top10Html = top10.map(p => `
-        <div style="
-            display: flex; 
-            justify-content: space-between; 
-            border-bottom: 1px solid #2e7d32; 
-            padding: 8px 0; 
-            font-size: 16px;
-            color: ${p.rank === 1 ? '#ffeb3b' : '#5dfc9b'};
-            ${p.rank === 1 ? 'font-weight: bold; text-shadow: 0 0 5px #ffeb3b;' : ''}
-        ">
-            <span>#${p.rank} ${p.name}</span>
-            <span>${p.finishTime}s</span>
-        </div>
-    `).join('');
-        const restartHtml = isHost ? `
-        <button id="restartBtn" style="
-          background:#5dfc9b; color:#003b1f; border:none;
-          padding:12px 30px; font-family:monospace; font-weight:bold;
-          font-size:18px; cursor:pointer; width: 100%;
-        ">PLAY AGAIN</button>
-        ` : `
-        <div style="
-          color:#5dfc9b;
-          font-family:monospace;
-          font-size:14px;
-          opacity:0.85;
-          margin-top:10px;
-          text-align:center;
-        ">
-          Waiting for host to restart...
-        </div>
-        `;
-        const dom = this.scene.add.dom(cx, cy).createFromHTML(`
-      <div style="
-        background: #003b1f;
-        border: 4px solid #5dfc9b;
-        padding: 20px 30px;
-        text-align: center;
-        font-family: 'Courier New', monospace;
-        min-width: 320px;
-        box-shadow: 0 0 30px rgba(0,0,0,0.8);
-      ">
-        <h1 style="color:#ffeb3b; margin:0 0 15px 0; font-size:24px; border-bottom: 2px solid #ffeb3b;">
-            LEADERBOARD
-        </h1>
-        
-        <div style="max-height: 350px; overflow-y: auto; margin-bottom: 20px; text-align: left; padding-right: 5px;">
-            ${top10Html}
-        </div>
-
-        ${restartHtml}
-      </div>
-    `).setDepth(DEPTH.UI + 1).setScrollFactor(0);
-
-        dom.addListener('click');
-        dom.on('click', (e) => {
-            if (!isHost) return;
-            if (e.target && e.target.id === 'restartBtn') this.scene.events.emit('restartRequested');
-        });
-
-        this.winnerContainer = dom;
-
-        dom.setScale(0);
-        this.scene.tweens.add({
-            targets: dom,
-            scale: 1,
-            duration: 400,
-            ease: 'Back.Out'
-        });
-
-        this.layout();
     }
 }

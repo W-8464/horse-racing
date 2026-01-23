@@ -17,6 +17,7 @@ export default class GameScene extends Phaser.Scene {
             isFinished: false,
             isRaceStarted: false,
             isCountdownRunning: false,
+            finishedPlayers: [],
             sounds: {}
         };
 
@@ -248,7 +249,6 @@ export default class GameScene extends Phaser.Scene {
 
             if (this.state.role === 'host' && !this.state.isFinished) {
                 if (!this.lastLeaderboardUpdate || time - this.lastLeaderboardUpdate > 200) {
-
                     const allHorses = [...this.players.otherPlayers.getChildren()];
                     if (this.players.horse) allHorses.push(this.players.horse);
 
