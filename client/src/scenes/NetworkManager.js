@@ -170,7 +170,7 @@ export default class NetworkManager {
 
             this.renderBuffer.push({
                 p: playerSnapshot,
-                ts: data.ts
+                ts: Date.now()
             });
 
             if (this.renderBuffer.length > 30) this.renderBuffer.shift();
