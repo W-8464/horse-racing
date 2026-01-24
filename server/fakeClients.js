@@ -1,7 +1,7 @@
 const { io } = require("socket.io-client");
 
 const URL = "http://103.82.37.188/";
-const MAX_USERS = 50;
+const MAX_USERS = 100;
 
 // ===== CẤU HÌNH HÀNH VI BOT =====
 const INPUT_INTERVAL_MIN = 120; // ms
@@ -9,7 +9,7 @@ const INPUT_INTERVAL_MAX = 220; // ms
 const MOVE_STEP_MIN = 2.5;
 const MOVE_STEP_MAX = 4.5;
 
-const FINISH_LINE_X = 5000;
+const FINISH_LINE_X = 5400;
 
 function rand(min, max) {
     return Math.random() * (max - min) + min;
