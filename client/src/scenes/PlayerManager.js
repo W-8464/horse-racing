@@ -32,7 +32,8 @@ export default class PlayerManager {
             'horse',
             playerInfo.id,
             playerInfo.horseColor,
-            playerInfo.name
+            playerInfo.name,
+            true
         );
 
         this.horse.setDepth(DEPTH.HORSE);
@@ -58,7 +59,8 @@ export default class PlayerManager {
             'horse',
             playerInfo.id,
             playerInfo.horseColor,
-            playerInfo.name
+            playerInfo.name,
+            false
         );
 
         other.serverIndex = playerInfo.serverIndex;

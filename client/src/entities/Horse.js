@@ -1,12 +1,13 @@
 import { DEPTH } from '../config/config.js';
 
 export default class Horse extends Phaser.Physics.Arcade.Sprite {
-    constructor(scene, x, y, texture, id, color, name = '') {
+    constructor(scene, x, y, texture, id, color, name = '', isLocal = false) {
         super(scene, x, y, texture);
         this.textureKey = texture;
         this.playerId = id;
         this.baseColor = color;
         this.playerName = name;
+        this.isLocal = isLocal;
 
         this._runAnimKey = `${this.textureKey}_run`;
         this._idleAnimKey = `${this.textureKey}_idle`;
@@ -20,6 +21,7 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
         this.setTint(this.baseColor);
         this.setDepth(DEPTH.HORSE);
 
+        const nameColor = isLocal ? '#ff0000' : '#ffffff';
         this.nameText = scene.add.text(
             x,
             y - 40,
@@ -27,7 +29,7 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
             {
                 fontFamily: 'monospace',
                 fontSize: '14px',
-                color: '#ffffff',
+                color: nameColor,
                 stroke: '#000000',
                 strokeThickness: 3
             }

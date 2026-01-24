@@ -66,7 +66,7 @@ export default class FlashSkillManager {
         const horse = this.players.horse;
         if (!horse) return;
 
-        horse.x += 150;
+        horse.x += 50;
         this.network.emitMovement(horse.x);
 
         this.scene.time.delayedCall(500, () => {
