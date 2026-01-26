@@ -18,6 +18,14 @@
     <script src="/socket.io/socket.io.js"></script>
 
     <style>
+        * {
+            -webkit-user-select: none !important;
+            user-select: none !important;
+            -webkit-touch-callout: none !important;
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+            touch-action: none;
+        }
+
         /* 4. CSS để khóa màn hình tuyệt đối */
         html,
         body {
@@ -71,13 +79,67 @@
             /* Giúp người dùng click xuyên qua thẻ này để tương tác với game */
             user-select: none;
         }
+
+        #rotate-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.92);
+            z-index: 9999;
+            display: none;
+
+            justify-content: center;
+            align-items: center;
+
+            pointer-events: all;
+            /* chặn toàn bộ thao tác */
+        }
+
+        #rotate-overlay.active {
+            display: flex;
+        }
+
+        .rotate-box {
+            color: #fff;
+            font-size: 20px;
+            text-align: center;
+            line-height: 1.6;
+            padding: 20px 28px;
+            border: 2px solid #fff;
+            border-radius: 12px;
+        }
     </style>
 </head>
 
 <body>
+    <div id="rotate-overlay">
+        <div class="rotate-box">
+            🔄 Vui lòng xoay ngang màn hình<br />
+            để tiếp tục chơi
+        </div>
+    </div>
     <div id="game-container"></div>
     <div id="version-tag">v2.2</div>
     <script type="module" src="src/main.js"></script>
 </body>
 
 </html>
+
+<script>
+    const overlay = document.getElementById('rotate-overlay');
+
+    function checkOrientation() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        if (h > w) {
+            overlay.classList.add('active');
+        } else {
+            overlay.classList.remove('active');
+        }
+    }
+
+    checkOrientation();
+
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+</script>

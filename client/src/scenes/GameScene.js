@@ -188,14 +188,6 @@ export default class GameScene extends Phaser.Scene {
     }
 
     createAnimations() {
-        // if (!this.anims.exists('horse_run')) {
-        //     this.anims.create({
-        //         key: 'horse_run',
-        //         frames: this.anims.generateFrameNumbers('horse', { start: 4, end: 7 }),
-        //         frameRate: 6,
-        //         repeat: -1
-        //     });
-        // }
         if (!this.anims.exists('horse_run')) {
             this.anims.create({
                 key: 'horse_run',
@@ -244,6 +236,8 @@ export default class GameScene extends Phaser.Scene {
     }
 
     update(time) {
+        if (window.innerHeight > window.innerWidth) return;
+
         if (this.players && this.network) {
             this.players.updateAllPositions(this.network);
 

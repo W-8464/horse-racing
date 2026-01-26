@@ -93,7 +93,7 @@ export default class EnvironmentManager {
             for (let x = 0; x < this.worldWidth; x += 350) {
                 this.scene.add.image(x, -20, 'lantern')
                     .setOrigin(0.5, 0)
-                    .setScale(0.35)
+                    .setScale(0.25)
                     .setDepth(DEPTH.LANTERN);
             }
             this._lanternsCreated = true;
