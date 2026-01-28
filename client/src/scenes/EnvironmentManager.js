@@ -9,7 +9,6 @@ export default class EnvironmentManager {
 
         this.ground = null;
         this.sky = null;
-        // Đã bỏ this.trees
 
         this._texturesCreated = false;
         this._staticObjectsCreated = false;
@@ -139,8 +138,6 @@ export default class EnvironmentManager {
             this.scene.players.updateHorseY(this.groundY - 130);
         }
     }
-
-    // Đã xóa drawTrees()
 
     launchFireworks() {
         // ... (Giữ nguyên code pháo hoa cũ)

@@ -59,7 +59,6 @@ export default class GameScene extends Phaser.Scene {
 
         this.load.spritesheet('horse', 'assets/images/horse-run.png', { frameWidth: 384, frameHeight: 270 });
         this.load.spritesheet('idle', 'assets/images/horse-idle.png', { frameWidth: 384, frameHeight: 270 });
-        this.load.spritesheet('tree', 'assets/images/Tree.png', { frameWidth: 253, frameHeight: 262 });
         this.load.image('lantern', 'assets/images/light.png');
         this.load.image('flash_icon', 'assets/images/flash.png');
         this.load.audio('bgm', 'assets/sounds/background_music.mp3');
@@ -148,7 +147,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        if (window.innerHeight > window.innerWidth) return;
+        // if (window.innerHeight > window.innerWidth) return;
 
         // HOST: Không update visual ngựa
         if (this.state.role === 'host') return;
@@ -225,15 +224,6 @@ export default class GameScene extends Phaser.Scene {
                 frames: this.anims.generateFrameNumbers('idle', { start: 0, end: 3 }),
                 frameRate: 6,
                 repeat: -1
-            });
-        }
-        if (!this.anims.exists('tree_sway')) {
-            this.anims.create({
-                key: 'tree_sway',
-                frames: this.anims.generateFrameNumbers('tree', { start: 0, end: 3 }),
-                frameRate: 3,
-                repeat: -1,
-                yoyo: true
             });
         }
     }
