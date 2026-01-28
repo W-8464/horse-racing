@@ -1,5 +1,3 @@
-// config.js
-
 export const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
@@ -9,7 +7,6 @@ export const config = {
     scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH,
-        // Cập nhật kích thước chuẩn mới
         width: 932,
         height: 430,
         fullscreenTarget: 'game-container'
@@ -21,27 +18,28 @@ export const config = {
 };
 
 export const GAME_SETTINGS = {
-    // Tối ưu cho tỉ lệ 932x430
     DESIGN_WIDTH: 932,
     DESIGN_HEIGHT: 430,
 
-    START_LINE_X: 100, // Thu hẹp lề một chút
-    FINISH_LINE_X: 5400, // Kéo dài đường đua để tận dụng màn hình ngang
+    START_LINE_X: 100,
+    FINISH_LINE_X: 5400,
     WORLD_WIDTH: 5500,
 
     COUNTDOWN_TIME: 3,
     TICK_RATE: 20,
     INPUT_BATCH_MS: 50,
-    CLICK_STEP_DISTANCE: 10
+    CLICK_STEP_DISTANCE: 10,
+    GROUND_HEIGHT: 64,
+
+    get GROUND_Y() { return this.DESIGN_HEIGHT - this.GROUND_HEIGHT; },
+    get HORSE_Y() { return this.GROUND_Y - 130; }
 };
 
 export const DEPTH = {
     SKY: 0,
     CLOUD: 1,
-    GRASS: 2,
-    CHECK_LINE: 3,
-    HORSE: 5,
-    TREE: 10,
-    LANTERN: 15,
+    GROUND: 10,
+    CHECK_LINE: 11,
+    HORSE: 20,
     UI: 100
 };

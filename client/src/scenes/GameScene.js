@@ -59,6 +59,7 @@ export default class GameScene extends Phaser.Scene {
 
         this.load.spritesheet('horse', 'assets/images/horse-run.png', { frameWidth: 384, frameHeight: 270 });
         this.load.spritesheet('idle', 'assets/images/horse-idle.png', { frameWidth: 384, frameHeight: 270 });
+        this.load.spritesheet('tree', 'assets/images/Tree.png', { frameWidth: 253, frameHeight: 262 });
         this.load.image('lantern', 'assets/images/light.png');
         this.load.image('flash_icon', 'assets/images/flash.png');
         this.load.audio('bgm', 'assets/sounds/background_music.mp3');
@@ -72,8 +73,7 @@ export default class GameScene extends Phaser.Scene {
         // 1. Tạo môi trường và ngựa như bình thường (để tránh lỗi null reference)
         this.env = new EnvironmentManager(this);
         this.env.createPixelTextures();
-        const initialWorldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT || 720, this.scale.height);
-        this.env.setupWorld(initialWorldHeight);
+        this.env.setupWorld(this.scale.height);
 
         this.createAnimations();
 
@@ -193,25 +193,21 @@ export default class GameScene extends Phaser.Scene {
         const width = gameSize.width;
         const height = gameSize.height;
         const cam = this.cameras.main;
-        const baseW = GAME_SETTINGS.DESIGN_WIDTH || 1560;
-        const baseH = GAME_SETTINGS.DESIGN_HEIGHT || 720;
 
-        // Host không cần zoom track, chỉ cần UI
-        if (this.state.role === 'host') {
-            cam.setViewport(0, 0, width, height);
-            cam.setSize(width, height);
-            cam.setScroll(0, 0); // Reset scroll về 0,0 để UI căn giữa
-        } else {
-            const rawZoom = Math.min(width / baseW, height / baseH);
-            const zoom = Phaser.Math.Clamp(rawZoom, 0.45, 1);
-            cam.setViewport(0, 0, width, height);
-            cam.setSize(width, height);
-            const worldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT || 720, height);
-            cam.setBounds(0, 0, GAME_SETTINGS.WORLD_WIDTH, worldHeight);
-            this.env?.resize(worldHeight);
+        // LOGIC RESPONSIVE MỚI:
+        // Luôn full màn hình, camera chỉ giới hạn chiều rộng đường đua
+        cam.setViewport(0, 0, width, height);
+        cam.setSize(width, height);
+
+        // Cập nhật bounds camera theo chiều cao mới
+        cam.setBounds(0, 0, GAME_SETTINGS.WORLD_WIDTH, height);
+
+        // Gọi Env resize để vẽ lại đất và cây ở vị trí đáy màn hình mới
+        if (this.env) {
+            this.env.resize(height);
         }
 
-        this.ui?.layout();
+        if (this.ui) this.ui.layout();
     }
 
     createAnimations() {
@@ -229,6 +225,15 @@ export default class GameScene extends Phaser.Scene {
                 frames: this.anims.generateFrameNumbers('idle', { start: 0, end: 3 }),
                 frameRate: 6,
                 repeat: -1
+            });
+        }
+        if (!this.anims.exists('tree_sway')) {
+            this.anims.create({
+                key: 'tree_sway',
+                frames: this.anims.generateFrameNumbers('tree', { start: 0, end: 3 }),
+                frameRate: 3,
+                repeat: -1,
+                yoyo: true
             });
         }
     }

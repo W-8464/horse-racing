@@ -51,7 +51,6 @@ export default class NetworkManager {
 
             if (this.state.role !== 'host' && this.players) {
                 if (data.s === 'RUNNING') this.state.isRaceStarted = true;
-                this.players.updateSharedHorse(data.p, 0);
             }
         });
 

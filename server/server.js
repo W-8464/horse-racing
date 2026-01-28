@@ -16,7 +16,7 @@ app.get('/player', sendIndex);
 app.get('/host', sendIndex);
 
 // --- CẤU HÌNH ---
-const TARGET_TAPS = 100;
+const TARGET_TAPS = 1000;
 let currentTotalTaps = 0;
 let playerContributions = {}; // Lưu danh sách người chơi
 

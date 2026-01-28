@@ -469,17 +469,25 @@ export default class UIManager {
         this.progressGraphics.clear();
 
         const { cx, h } = this._getLayout();
-        const yPos = h - 80;
-        const width = 300;
-        const height = 20;
-        const radius = 10;
 
-        this.progressGraphics.fillStyle(0x222222, 1);
+        // SỬA: Đặt thanh progress xuống dưới đất
+        // h là đáy màn hình. Đất cao 64px. Tâm đất là h - 32.
+        const yPos = h - 30;
+
+        // Tăng chiều rộng lên chút cho dễ nhìn
+        const width = 400;
+        const height = 16; // Nhỏ lại xíu
+        const radius = 8;
+
+        // Vẽ nền (Màu nâu đậm cho hợp với đất)
+        this.progressGraphics.fillStyle(0x3e2723, 1); // Dark brown
         this.progressGraphics.fillRoundedRect(cx - width / 2, yPos - height / 2, width, height, radius);
 
-        this.progressGraphics.lineStyle(2, 0x005c30, 0.5);
+        // Viền
+        this.progressGraphics.lineStyle(2, 0xffeb3b, 0.5); // Viền vàng nhạt
         this.progressGraphics.strokeRoundedRect(cx - width / 2, yPos - height / 2, width, height, radius);
 
+        // Vẽ phần Fill (Giữ màu cam/đỏ nổi bật)
         if (progress > 0) {
             const fillWidth = Math.max(radius * 2, width * progress);
             if (fillWidth > 0) {
@@ -502,7 +510,7 @@ export default class UIManager {
         if (this.finishRankText) this.finishRankText.destroy();
         this.finishRankText = this.scene.add.text(
             cx, cy - 100,
-            "MADE BY SE TEAM!",
+            "HAPPY NEW YEAR",
             { fontSize: '48px', fontFamily: 'monospace', color: '#5dfc9b', align: 'center', stroke: '#000', strokeThickness: 6 }
         ).setOrigin(0.5).setDepth(DEPTH.UI).setScrollFactor(0);
     }
