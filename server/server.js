@@ -27,26 +27,52 @@ let gameState = {
 };
 
 let startTime = 0;
-const TICK_RATE = 10;
+const GAME_TICK_RATE = 20;
+const LEADERBOARD_TICK_RATE = 2;
 
-// 1. SỬA VÒNG LẶP: Gửi update LIÊN TỤC kể cả khi đang ở LOBBY
 setInterval(() => {
-    // Không check if (gameState.status !== 'LOBBY') nữa
-    // Để Host cập nhật được danh sách người chơi ra/vào realtime
+    // Nếu game chưa chạy hoặc không có người thì bỏ qua để tiết kiệm CPU
+    if (gameState.status === 'LOBBY' && Object.keys(playerContributions).length === 0) return;
 
+    // Tính toán tiến độ chung
     const progress = Math.min((currentTotalTaps / TARGET_TAPS), 1);
+
+    // Tổng số người chơi (để hiện "+199 others")
     const totalPlayers = Object.keys(playerContributions).length;
 
-    io.emit('gameStateUpdate', {
-        progress: progress,
-        currentTaps: currentTotalTaps,
-        targetTaps: TARGET_TAPS,
-        contributions: playerContributions,
-        totalPlayers: totalPlayers,
-        status: gameState.status,
-        ts: Date.now()
+    // Gói tin siêu nhẹ: Chỉ chứa 3 thông số cơ bản
+    // Broadcast cho TẤT CẢ (Host + 200 Players)
+    io.emit('gameUpdateFast', {
+        p: Number(progress.toFixed(4)), // Làm tròn 4 số thập phân (vd: 0.5123)
+        s: gameState.status,            // Trạng thái game (LOBBY/RUNNING...)
+        t: totalPlayers                 // Tổng số người
     });
-}, 1000 / TICK_RATE);
+
+}, 1000 / GAME_TICK_RATE);
+
+
+// --- VÒNG LẶP 2: XỬ LÝ LEADERBOARD (Chỉ gửi cho HOST) ---
+// Mục tiêu: Giảm tải việc sắp xếp mảng 200 phần tử và giảm băng thông
+setInterval(() => {
+    // Chỉ chạy khi có Host kết nối và có người chơi
+    if (!gameState.hostId || Object.keys(playerContributions).length === 0) return;
+
+    // Lấy danh sách tất cả người chơi
+    const allPlayers = Object.values(playerContributions);
+
+    // Sort Top 10 (Việc này tốn CPU nên chỉ làm ở vòng lặp chậm)
+    const top10 = allPlayers
+        .sort((a, b) => b.taps - a.taps)
+        .slice(0, 10);
+
+    // CHỈ GỬI CHO HOST (Tiết kiệm băng thông cực lớn)
+    // Player không cần nhận dữ liệu này
+    io.to(gameState.hostId).emit('leaderboardUpdate', {
+        top: top10,
+        total: allPlayers.length
+    });
+
+}, 1000 / LEADERBOARD_TICK_RATE);
 
 io.on('connection', (socket) => {
     // 2. THÊM: Ngay khi kết nối, báo cho Client biết trạng thái game hiện tại
@@ -84,15 +110,14 @@ io.on('connection', (socket) => {
         socket.emit('playerAccepted');
     });
 
-    socket.on('playerTap', () => {
-        // Chỉ nhận tap khi game đang RUNNING
+    socket.on('playerTap', (data) => {
         if (gameState.status !== 'RUNNING') return;
-
-        // Nếu người chơi này không có trong danh sách (do vào sau hoặc lỗi), bỏ qua
         if (!playerContributions[socket.id]) return;
 
-        currentTotalTaps++;
-        playerContributions[socket.id].taps++;
+        const tapCount = (data && data.count) ? data.count : 1;
+        if (tapCount > 50) return;
+        currentTotalTaps += tapCount;
+        playerContributions[socket.id].taps += tapCount;
 
         if (currentTotalTaps >= TARGET_TAPS) {
             gameState.status = 'FINISHED';
@@ -100,11 +125,10 @@ io.on('connection', (socket) => {
             const leaderboard = Object.values(playerContributions)
                 .sort((a, b) => b.taps - a.taps)
                 .slice(0, 10);
-            const totalPlayers = Object.keys(playerContributions).length;
 
             io.emit('raceFinished', {
                 topContributors: leaderboard,
-                totalPlayers: totalPlayers,
+                totalPlayers: Object.keys(playerContributions).length,
                 totalTime: finishTime
             });
         }

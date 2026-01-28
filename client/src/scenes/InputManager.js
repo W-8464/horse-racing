@@ -5,24 +5,34 @@ export default class InputManager {
         this.state = state;
         this.network = network;
         this.ui = ui;
+
+        this.pendingTaps = 0;
+        this.lastSendTime = 0;
     }
 
     init() {
-        // Dùng pointerdown cho nhạy
         this.scene.input.on('pointerdown', (pointer) => this.onPointerDown(pointer));
+        this.scene.time.addEvent({
+            delay: 100, // 100ms
+            loop: true,
+            callback: () => this.flushTaps()
+        });
     }
 
     onPointerDown(pointer) {
-        // Chỉ Player mới được tap
         if (this.state.role !== 'player') return;
-
-        // Game chưa chạy hoặc đã xong thì nghỉ
         if (!this.state.isRaceStarted || this.state.isFinished) return;
 
-        // Gửi tap lên server
-        this.network.sendTap();
+        this.pendingTaps++;
 
         // Hiệu ứng Visual (Optional): Tạo bụi hoặc hiệu ứng click tại chỗ chuột
         // this.ui.showClickEffect(pointer.x, pointer.y);
+    }
+
+    flushTaps() {
+        if (this.pendingTaps > 0) {
+            this.network.sendTap(this.pendingTaps);
+            this.pendingTaps = 0;
+        }
     }
 }

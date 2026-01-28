@@ -49,6 +49,22 @@ export default class NetworkManager {
             this.ui.showSpectatorMode();
         });
 
+        this.socket.on('gameUpdateFast', (data) => {
+            this.state.progress = data.p;
+            this.ui.updateProgressBar(data.p, 0);
+
+            if (this.state.role !== 'host' && this.players) {
+                if (data.s === 'RUNNING') this.state.isRaceStarted = true;
+                this.players.updateSharedHorse(data.p, 0);
+            }
+        });
+
+        this.socket.on('leaderboardUpdate', (data) => {
+            if (this.state.role === 'host') {
+                this.ui.updateHostLeaderboard(data.top, data.total);
+            }
+        });
+
         this.socket.on('raceReset', (data) => {
             // Data nhận về: { players: [], totalPlayers: 0 }
 
@@ -156,26 +172,6 @@ export default class NetworkManager {
             }
         });
 
-        this.socket.on('gameStateUpdate', (data) => {
-            this.state.progress = data.progress;
-            this.state.speed = data.speed; // (Lưu ý: server code mới của bạn chưa tính speed, nếu cần thì thêm logic tính speed bên server)
-
-            // Cập nhật Leaderboard realtime cho Host (Ngay cả ở Lobby)
-            if (this.state.role === 'host' && data.contributions) {
-                const sortedContributors = Object.values(data.contributions)
-                    .sort((a, b) => b.taps - a.taps)
-                    .slice(0, 10);
-                this.ui.updateHostLeaderboard(sortedContributors, data.totalPlayers || 0);
-            }
-
-            // Cập nhật Leaderboard cho Spectator (nếu muốn khán giả cũng thấy top)
-            if (this.state.role === 'spectator') {
-                this.ui.updateProgressBar(data.progress, data.speed);
-            }
-
-            this.ui.updateProgressBar(data.progress, data.speed);
-        });
-
         this.socket.on('forceReload', () => {
             window.location.reload();
         });
@@ -214,8 +210,8 @@ export default class NetworkManager {
         this.socket.emit('hostStartGame');
     }
 
-    sendTap() {
-        this.socket.emit('playerTap');
+    sendTap(count = 1) {
+        this.socket.emit('playerTap', { count: count });
     }
 
     requestRestart() {
