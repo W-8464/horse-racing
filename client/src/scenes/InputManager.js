@@ -1,36 +1,28 @@
+// InputManager.js
 export default class InputManager {
     constructor(scene, state, players, network, flashSkill, ui) {
         this.scene = scene;
         this.state = state;
-        this.players = players;
         this.network = network;
-        this.flashSkill = flashSkill;
         this.ui = ui;
     }
 
     init() {
+        // Dùng pointerdown cho nhạy
         this.scene.input.on('pointerdown', (pointer) => this.onPointerDown(pointer));
     }
 
     onPointerDown(pointer) {
-        // chặn khi winner overlay đang mở
-        if (this.ui.isWinnerOpen()) return;
-
-        // chỉ player mới được click để chạy
+        // Chỉ Player mới được tap
         if (this.state.role !== 'player') return;
 
-        // chỉ chạy khi race started
-        if (!this.state.isRaceStarted || this.state.isFinished || !this.players.horse) return;
+        // Game chưa chạy hoặc đã xong thì nghỉ
+        if (!this.state.isRaceStarted || this.state.isFinished) return;
 
-        // click vào flash button thì bỏ qua click chạy
-        if (this.flashSkill.isPointerOnButton(pointer)) return;
+        // Gửi tap lên server
+        this.network.sendTap();
 
-        this.players.moveSelfBy(20);
-        this.network.emitMovement(this.players.horse.x);
-
-        if (this.players.horse.requestRun) this.players.horse.requestRun(1);
-        else if (this.players.horse.playRun) this.players.horse.playRun();
-
-        this.flashSkill.registerNormalClick();
+        // Hiệu ứng Visual (Optional): Tạo bụi hoặc hiệu ứng click tại chỗ chuột
+        // this.ui.showClickEffect(pointer.x, pointer.y);
     }
 }

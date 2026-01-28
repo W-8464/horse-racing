@@ -4,34 +4,8 @@ export default class NetworkManager {
         this.state = state;
         this.players = players;
         this.ui = ui;
-
-        this.playerName = null;
-
         this.socket = null;
-        this.renderBuffer = [];
-        this.bufferDelay = 100;
-
-        this.hiddenTime = 0;
-        this.setupVisibilityListener();
     }
-
-    setupVisibilityListener() {
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') {
-                this.hiddenTime = Date.now();
-                return;
-            }
-
-            const timeAway = (Date.now() - this.hiddenTime) / 1000;
-
-            if (this.socket?.disconnected) {
-                this.socket.connect();
-            }
-
-            if (timeAway > 60) window.location.reload();
-        });
-    }
-
 
     init() {
         this.socket = io({
@@ -54,46 +28,80 @@ export default class NetworkManager {
     }
 
     bindListeners() {
-        this.socket.on('currentPlayers', (players) => {
-            this.players.syncCurrentPlayers(players, this.socket.id);
+        this.socket.on('initialState', (status) => {
+            if (this.state.role !== 'host' && status !== 'LOBBY') {
+                console.log('Game đang chạy, chuyển sang chế độ khán giả');
+
+                this.state.role = 'spectator';
+
+                // QUAN TRỌNG: Nếu game đang chạy hoặc đếm ngược, phải set state để ngựa chạy
+                if (status === 'RUNNING') {
+                    this.state.isRaceStarted = true;
+                }
+
+                this.ui.showSpectatorMode();
+            }
         });
 
-        this.socket.on('newPlayer', (playerInfo) => {
-            this.players.addOther(playerInfo, this.socket.id);
+        this.socket.on('joinError', (msg) => {
+            alert(msg);
+            this.state.role = 'spectator';
+            this.ui.showSpectatorMode();
         });
 
-        this.socket.on('playerMoved', (playerInfo) => {
-            this.players.updateOtherPosition(playerInfo);
-        });
+        this.socket.on('raceReset', (data) => {
+            // Data nhận về: { players: [], totalPlayers: 0 }
 
-        this.socket.on('playerDisconnected', (playerId) => {
-            this.players.removeOther(playerId);
-        });
+            // 1. Reset State
+            this.state.progress = 0;
+            this.state.speed = 0;
+            this.state.isRaceStarted = false;
+            this.state.isFinished = false;
+            this.state.finishedPlayers = [];
 
-        this.socket.on('raceReset', (players) => {
+            // 2. Reset UI chung
+            this.ui.destroyWinner();
+            this.ui.destroyStartButton();
+            this.ui.destroyWaitingText();
+            this.ui.updateProgressBar(0, 0);
+            this.ui.destroySpectatorText();
+
+            // Reset Ngựa
+            this.players.resetSharedHorse();
+
+            // Reset Âm thanh
             if (!this.scene.state.sounds.bgm.isPlaying) {
                 this.scene.state.sounds.bgm.play();
             }
             this.scene.state.sounds.gallop.stop();
             this.scene.state.sounds.audience.stop();
 
-            this.state.isRaceStarted = false;
-            this.state.isFinished = false;
+            // 3. UI RIÊNG CHO TỪNG ROLE
+            if (this.state.role === 'host') {
+                // Cập nhật Leaderboard ngay lập tức với điểm số 0
+                this.ui.updateHostLeaderboard(data.players, data.totalPlayers);
 
-            this.scene.state.finishedPlayers = [];
+                // Hiện lại nút Start
+                this.ui.showStartButton(() => this.hostStartGame());
+            }
 
-            this.players.resetPositionsFromServer(players, this.socket.id);
+            if (this.state.role === 'player') {
+                // Hiện lại chữ Waiting cho Player
+                this.ui.showWaitingText();
+            }
 
-            // UI theo role
-            this.ui.destroyWinner();
-            this.ui.destroyStartButton();
-            this.ui.destroyWaitingText();
-
-            if (this.state.role === 'host') this.ui.showStartButton(() => this.hostStartGame());
-            if (this.state.role === 'player') this.ui.showWaitingText();
+            if (this.state.role === 'spectator') {
+                // Chuyển role về null hoặc player để cho phép nhập tên lại
+                this.state.role = null;
+                this.ui.showPlayerNameInput((name) => {
+                    this.scene.handleFullScreen();
+                    this.state.role = 'player';
+                    this.selectRolePlayer(name);
+                    this.ui.showWaitingText();
+                });
+            }
         });
 
-        // auth host
         this.socket.on('hostRejected', () => {
             if (this.state.role === 'host') this.ui.showHostPasswordError();
         });
@@ -107,7 +115,6 @@ export default class NetworkManager {
 
         this.socket.on('playerAccepted', () => {
             if (this.state.role === 'player') {
-                // player đã được server accept => chờ host start
                 this.ui.showWaitingText();
             }
         });
@@ -121,7 +128,9 @@ export default class NetworkManager {
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
 
-            this.ui.startCountdown();
+            if (this.state.role === 'player') {
+                this.ui.startCountdown();
+            }
 
             this.scene.time.delayedCall(3000, () => {
                 if (!this.scene.state.sounds.gallop.isPlaying) {
@@ -130,16 +139,11 @@ export default class NetworkManager {
             });
         });
 
-        this.socket.on('youFinished', (data) => {
-            this.ui.showLocalFinishRank(data.rank);
-            this.scene.state.sounds.finish.play();
-            this.scene.state.sounds.gallop.stop();
-        });
-
+        // XỬ LÝ KẾT THÚC GAME
         this.socket.on('raceFinished', (data) => {
-            this.scene.state.finishedPlayers = data.top10;
-            this.state.isRaceStarted = false;
             this.state.isFinished = true;
+            this.state.isRaceStarted = false;
+            this.players.updateSharedHorse(1, 0);
 
             this.scene.state.sounds.audience.stop();
             this.scene.state.sounds.gallop.stop();
@@ -148,39 +152,33 @@ export default class NetworkManager {
             }
 
             if (this.state.role === 'host') {
-                this.ui.updateHostLeaderboard(data.top10, data.top10);
+                this.ui.updateHostLeaderboard(data.topContributors || [], data.totalPlayers || 0);
             }
         });
 
         this.socket.on('gameStateUpdate', (data) => {
-            let rawBuffer = data.b;
+            this.state.progress = data.progress;
+            this.state.speed = data.speed; // (Lưu ý: server code mới của bạn chưa tính speed, nếu cần thì thêm logic tính speed bên server)
 
-            if (!(rawBuffer instanceof ArrayBuffer) && rawBuffer.buffer) {
-                rawBuffer = rawBuffer.buffer;
+            // Cập nhật Leaderboard realtime cho Host (Ngay cả ở Lobby)
+            if (this.state.role === 'host' && data.contributions) {
+                const sortedContributors = Object.values(data.contributions)
+                    .sort((a, b) => b.taps - a.taps)
+                    .slice(0, 10);
+                this.ui.updateHostLeaderboard(sortedContributors, data.totalPlayers || 0);
             }
 
-            const positions = new Float32Array(rawBuffer);
-            const playerSnapshot = {};
-
-            for (let i = 0; i < positions.length; i += 2) {
-                const playerIdx = positions[i];
-                const x = positions[i + 1];
-                playerSnapshot[playerIdx] = x;
+            // Cập nhật Leaderboard cho Spectator (nếu muốn khán giả cũng thấy top)
+            if (this.state.role === 'spectator') {
+                this.ui.updateProgressBar(data.progress, data.speed);
             }
 
-            this.renderBuffer.push({
-                p: playerSnapshot,
-                ts: Date.now()
-            });
-
-            if (this.renderBuffer.length > 30) this.renderBuffer.shift();
+            this.ui.updateProgressBar(data.progress, data.speed);
         });
 
         this.socket.on('forceReload', () => {
             window.location.reload();
         });
-
-        this.socket.off('playerMoved');
     }
 
     getInterpolatedState() {
@@ -216,8 +214,8 @@ export default class NetworkManager {
         this.socket.emit('hostStartGame');
     }
 
-    emitMovement(x) {
-        this.socket.emit('playerMovement', { x });
+    sendTap() {
+        this.socket.emit('playerTap');
     }
 
     requestRestart() {

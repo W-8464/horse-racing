@@ -12,8 +12,6 @@ export default class EnvironmentManager {
         this.mist = null;
         this._cloudsCreated = false;
         this._lanternsCreated = false;
-        this._checkLineXs = [];
-        this._checkLineGraphics = [];
     }
 
     createPixelTextures() {
@@ -115,7 +113,6 @@ export default class EnvironmentManager {
         this.scene.physics.world.setBounds(0, this.skyHeight, this.worldWidth, this.worldHeight - this.skyHeight);
 
         this._resizeGrass();
-        this._redrawCheckLines();
     }
 
     _resizeGrass() {
@@ -153,56 +150,5 @@ export default class EnvironmentManager {
         mist.fillRect(0, this.skyHeight, worldWidth, 80);
         mist.setDepth(DEPTH.GRASS + 0.1).setScrollFactor(1);
         return mist;
-    }
-
-    drawCheckeredLine(xPosition) {
-        this._checkLineXs.push(xPosition);
-
-        const g = this._createCheckeredLineGraphics(xPosition);
-        this._checkLineGraphics.push(g);
-        return g;
-    }
-
-    _createCheckeredLineGraphics(xPosition) {
-        const graphics = this.scene.add.graphics();
-        const groundHeight = this.worldHeight - this.skyHeight;
-        const baseTileHeight = 8; // Bắt đầu với ô rất dẹt ở phía xa
-
-        let currentY = this.skyHeight;
-        let i = 0;
-
-        while (currentY < this.worldHeight) {
-            const progress = (currentY - this.skyHeight) / groundHeight;
-            const dynamicHeight = Phaser.Math.Linear(8, 40, progress);
-            const dynamicWidth = Phaser.Math.Linear(20, 80, progress);
-
-            for (let col = 0; col < 2; col++) {
-                const isWhite = (i + col) % 2 === 0;
-                graphics.fillStyle(isWhite ? 0xffffff : 0x333333, 1);
-
-                const xOffset = col * dynamicWidth - (dynamicWidth);
-
-                graphics.fillRect(
-                    xPosition + xOffset,
-                    currentY,
-                    dynamicWidth,
-                    dynamicHeight
-                );
-            }
-
-            currentY += dynamicHeight;
-            i++;
-        }
-
-        graphics.setDepth(DEPTH.CHECK_LINE);
-        return graphics;
-    }
-
-    _redrawCheckLines() {
-        this._checkLineGraphics.forEach(g => g.destroy());
-        this._checkLineGraphics = [];
-        this._checkLineXs.forEach(x => {
-            this._checkLineGraphics.push(this._createCheckeredLineGraphics(x));
-        });
     }
 }

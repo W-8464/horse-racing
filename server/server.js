@@ -9,94 +9,115 @@ const io = require('socket.io')(http, {
 const path = require('path');
 
 app.use(express.static(path.join(__dirname, '../client')));
+const sendIndex = (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/index.html'));
+};
+app.get('/player', sendIndex);
+app.get('/host', sendIndex);
 
-const players = {};
+// --- CẤU HÌNH ---
+const TARGET_TAPS = 1000;
+let currentTotalTaps = 0;
+let playerContributions = {}; // Lưu danh sách người chơi
+
 const HOST_PASSWORD = 'a';
 let gameState = {
-    status: 'LOBBY', // LOBBY | COUNTDOWN | RUNNING
+    status: 'LOBBY', // LOBBY, COUNTDOWN, RUNNING, FINISHED
     hostId: null
 };
+
 let startTime = 0;
-let finishedPlayers = [];
-const FINISH_LINE_X = 5400;
-const COUNTDOWN_TIME = 3;
-
 const TICK_RATE = 10;
-const playerIndexMap = new Map();
-let nextFreeIndex = 0;
-const availableIndexes = [];
 
+// 1. SỬA VÒNG LẶP: Gửi update LIÊN TỤC kể cả khi đang ở LOBBY
 setInterval(() => {
-    const ids = Object.keys(players);
-    if (ids.length > 0) {
-        const buffer = new Float32Array(ids.length * 2);
+    // Không check if (gameState.status !== 'LOBBY') nữa
+    // Để Host cập nhật được danh sách người chơi ra/vào realtime
 
-        ids.forEach((id, i) => {
-            const idx = playerIndexMap.get(id);
-            buffer[i * 2] = idx;
-            buffer[i * 2 + 1] = players[id].x;
-        });
+    const progress = Math.min((currentTotalTaps / TARGET_TAPS), 1);
+    const totalPlayers = Object.keys(playerContributions).length;
 
-        io.emit('gameStateUpdate', {
-            b: buffer,
-            ts: Date.now()
-        });
-    }
+    io.emit('gameStateUpdate', {
+        progress: progress,
+        currentTaps: currentTotalTaps,
+        targetTaps: TARGET_TAPS,
+        contributions: playerContributions,
+        totalPlayers: totalPlayers,
+        status: gameState.status,
+        ts: Date.now()
+    });
 }, 1000 / TICK_RATE);
 
 io.on('connection', (socket) => {
-    console.log('Người chơi mới:', socket.id);
+    // 2. THÊM: Ngay khi kết nối, báo cho Client biết trạng thái game hiện tại
+    // Để nếu game đang chạy, Client tự chuyển sang chế độ xem (Spectator)
+    socket.emit('initialState', gameState.status);
 
     socket.on('selectRole', (data) => {
         const { role, name, password, color } = data;
-        socket.role = role;
 
         if (role === 'host') {
             if (password !== HOST_PASSWORD) {
                 socket.emit('hostRejected', 'INVALID_PASSWORD');
                 return;
             }
-
             gameState.hostId = socket.id;
-
-            socket.emit('currentPlayers', players);
+            socket.role = 'host';
             socket.emit('hostAccepted');
             return;
         }
 
-        const horseColor = color || (Math.random() * 0xffffff);
-        const skyHeight = 110;
-        const padding = 30;
-
-        let assignedIndex;
-        if (availableIndexes.length > 0) {
-            assignedIndex = availableIndexes.shift();
-        } else {
-            assignedIndex = nextFreeIndex++;
+        // 3. SỬA: Chặn người chơi mới nếu Game KHÔNG CÒN Ở LOBBY
+        if (gameState.status !== 'LOBBY') {
+            socket.emit('joinError', 'Game đã bắt đầu! Bạn chỉ có thể theo dõi.');
+            return;
         }
 
-        playerIndexMap.set(socket.id, assignedIndex);
-
-        players[socket.id] = {
-            x: 100,
-            y: skyHeight + padding + ((Object.keys(players).length % 6) * 45),
+        socket.role = 'player';
+        playerContributions[socket.id] = {
             id: socket.id,
-            serverIndex: assignedIndex,
-            name,
-            horseColor: horseColor
+            name: name || 'Người chơi',
+            taps: 0,
+            color: color || (Math.random() * 0xffffff)
         };
 
-        socket.emit('currentPlayers', players);
-        socket.broadcast.emit('newPlayer', players[socket.id]);
-        socket.emit('playerAccepted', { index: assignedIndex });
+        socket.emit('playerAccepted');
+    });
+
+    socket.on('playerTap', () => {
+        // Chỉ nhận tap khi game đang RUNNING
+        if (gameState.status !== 'RUNNING') return;
+
+        // Nếu người chơi này không có trong danh sách (do vào sau hoặc lỗi), bỏ qua
+        if (!playerContributions[socket.id]) return;
+
+        currentTotalTaps++;
+        playerContributions[socket.id].taps++;
+
+        if (currentTotalTaps >= TARGET_TAPS) {
+            gameState.status = 'FINISHED';
+            const finishTime = ((Date.now() - startTime) / 1000).toFixed(2);
+            const leaderboard = Object.values(playerContributions)
+                .sort((a, b) => b.taps - a.taps)
+                .slice(0, 10);
+            const totalPlayers = Object.keys(playerContributions).length;
+
+            io.emit('raceFinished', {
+                topContributors: leaderboard,
+                totalPlayers: totalPlayers,
+                totalTime: finishTime
+            });
+        }
     });
 
     socket.on('hostStartGame', () => {
         if (socket.id !== gameState.hostId) return;
 
-        finishedPlayers = [];
-
-        Object.values(players).forEach(p => p.x = 100);
+        currentTotalTaps = 0;
+        // Reset điểm nhưng GIỮ NGUYÊN danh sách người chơi
+        Object.keys(playerContributions).forEach(id => {
+            playerContributions[id].taps = 0;
+        });
 
         gameState.status = 'COUNTDOWN';
         io.emit('startCountdown');
@@ -104,83 +125,41 @@ io.on('connection', (socket) => {
         setTimeout(() => {
             gameState.status = 'RUNNING';
             startTime = Date.now();
-        }, (COUNTDOWN_TIME + 1) * 1000);
-    });
-
-    socket.on('playerMovement', (data) => {
-        if (socket.role !== 'player' || gameState.status !== 'RUNNING') return;
-        const player = players[socket.id];
-        if (!player) return;
-        const alreadyFinished = finishedPlayers.find(p => p.id === socket.id);
-        if (alreadyFinished) return;
-
-        player.x = data.x;
-
-        if (data.x >= FINISH_LINE_X) {
-            const finishTime = ((Date.now() - startTime) / 1000).toFixed(2);
-            finishedPlayers.push({
-                id: socket.id,
-                name: player.name,
-                finishTime: finishTime
-            });
-
-            socket.emit('youFinished', { rank: finishedPlayers.length });
-
-            const totalPlayers = Object.keys(players).length;
-            const limit = Math.min(10, totalPlayers);
-
-            if (finishedPlayers.length >= limit) {
-                gameState.status = 'FINISHED';
-                const top10 = finishedPlayers.map((p, index) => ({
-                    id: p.id,
-                    rank: index + 1,
-                    name: p.name,
-                    finishTime: p.finishTime
-                }));
-
-                io.emit('raceFinished', {
-                    top10: top10
-                });
-            }
-        }
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Người chơi thoát:', socket.id);
-
-        if (socket.id === gameState.hostId) {
-            gameState.hostId = null;
-            gameState.status = 'LOBBY';
-            finishedPlayers = [];
-        }
-
-        const indexToFree = playerIndexMap.get(socket.id);
-
-        if (indexToFree !== undefined) {
-            availableIndexes.push(indexToFree);
-            availableIndexes.sort((a, b) => a - b);
-        }
-
-        playerIndexMap.delete(socket.id);
-        delete players[socket.id];
-        io.emit('playerDisconnected', socket.id);
+        }, 4000);
     });
 
     socket.on('hostRestartGame', () => {
         if (socket.id !== gameState.hostId) return;
 
-        finishedPlayers = [];
         gameState.status = 'LOBBY';
-        Object.values(players).forEach(p => p.x = 100);
+        currentTotalTaps = 0;
 
-        io.emit('raceReset', players);
+        // FIX: KHÔNG XÓA người chơi cũ (playerContributions = {} -> BỎ)
+        // Chỉ reset điểm số của họ về 0
+        Object.keys(playerContributions).forEach(id => {
+            playerContributions[id].taps = 0;
+        });
+
+        // Gửi danh sách đã reset về Client để cập nhật UI ngay lập tức
+        // Chuyển object thành array để gửi đi
+        const resetPlayers = Object.values(playerContributions);
+        const totalPlayers = resetPlayers.length;
+
+        io.emit('raceReset', {
+            players: resetPlayers,
+            totalPlayers: totalPlayers
+        });
     });
 
-    socket.on('resetRace', () => {
-        finishedPlayers = [];
-        gameState.status = 'LOBBY';
-        Object.values(players).forEach(p => p.x = 150);
-        io.emit('raceReset', players);
+    socket.on('disconnect', () => {
+        if (socket.id === gameState.hostId) {
+            gameState.hostId = null;
+            gameState.status = 'LOBBY';
+            playerContributions = {}; // Host out thì reset phòng
+        } else {
+            // Player out thì xóa khỏi danh sách
+            delete playerContributions[socket.id];
+        }
     });
 });
 

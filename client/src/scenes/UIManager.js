@@ -29,16 +29,24 @@ const PIXEL_BTN_STYLE = `
   transition: all 0.1s;
 `;
 
+// SỬA: Giảm max-height xuống 50vh để không che nút Start
 const LEADERBOARD_CONTAINER_STYLE = `
-    background: rgba(0, 59, 31, 0.85);
+    background: rgba(0, 20, 10, 0.95);
     border: 4px solid #5dfc9b;
-    padding: 15px;
+    padding: 20px;
     font-family: 'Courier New', monospace;
-    min-width: 280px;
+    
+    /* Kích thước */
+    width: 80vw;
+    max-width: 900px;
+    height: 50vh;       
+    max-height: 500px;
+    
+    display: flex;
+    flex-direction: column;
+    
     pointer-events: auto;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    max-height: 400px;
-    overflow-y: auto;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
 `;
 
 const REFRESH_BTN_STYLE = `
@@ -46,23 +54,18 @@ const REFRESH_BTN_STYLE = `
     border: none;
     color: #ffeb3b;
     cursor: pointer;
-    font-size: 20px;
-    padding: 0;
+    font-size: 24px;
+    padding: 5px;
     line-height: 1;
     display: flex;
     align-items: center;
-    transition: transform 0.1s;
-    position: absolute;
-    right: 24px;
+    transition: transform 0.3s;
 `;
 
 export default class UIManager {
     constructor(scene, state) {
         this.scene = scene;
         this.state = state;
-
-        this.playerBtn = null;
-        this.hostBtn = null;
 
         this.waitingText = null;
         this.startButton = null;
@@ -73,13 +76,13 @@ export default class UIManager {
         this.countdownText = null;
         this.finishRankText = null;
 
-        this.winnerOverlay = null;
-        this.winnerContainer = null;
-
         this._ratioInputY = 0.45;
         this._ratioCountdownY = 0.35;
 
         this.hostLeaderboardDom = null;
+
+        // Thay đổi: Dùng Graphics thay vì Image/Rect để vẽ bo tròn
+        this.progressGraphics = null;
     }
 
     _getLayout() {
@@ -87,12 +90,7 @@ export default class UIManager {
         const h = this.scene.scale.height;
         const cx = w / 2;
         const cy = h / 2;
-
-        const baseW = GAME_SETTINGS.DESIGN_WIDTH;
-        const baseH = GAME_SETTINGS.DESIGN_HEIGHT;
-        const s = Phaser.Math.Clamp(Math.min(w / baseW, h / baseH), 0.65, 1.2);
-
-        return { w, h, cx, cy, s };
+        return { w, h, cx, cy, s: 1 };
     }
 
     layout() {
@@ -114,54 +112,64 @@ export default class UIManager {
             this.waitingText.setPosition(cx, inputY);
             this.waitingText.setFontSize(Math.round(28 * clampedScale));
         }
+
+        // Vị trí nút Start: Cách đáy 80px
         if (this.startButton) {
-            this.startButton.setPosition(cx, inputY);
-            // Không scale container để tránh lệch hit-area.
+            this.startButton.setPosition(cx, h - 80);
         }
+
         if (this.countdownText) {
             this.countdownText.setPosition(cx, countdownY);
             this.countdownText.setFontSize(Math.round(96 * clampedScale));
         }
 
         if (this.hostLeaderboardDom) {
-            // Thay vì setPosition theo tâm màn hình, ta để CSS top/right lo việc này
-            // Hoặc nếu muốn dùng setPosition của Phaser:
-            this.hostLeaderboardDom.setPosition(w - 20, 20);
-            this.hostLeaderboardDom.setOrigin(1, 0); // Gốc tọa độ tại góc trên bên phải của DOM
+            // SỬA: Đẩy Leaderboard lên cao hơn một chút (cy - 50) để tránh đè nút Start
+            this.hostLeaderboardDom.setPosition(cx, cy - 50);
+
+            const listContainer = this.hostLeaderboardDom.getChildByID('leaderboard-list');
+            if (listContainer) {
+                if (w > h) { // Màn ngang
+                    listContainer.style.gridTemplateColumns = '1fr 1fr';
+                    listContainer.style.gridAutoFlow = 'column';
+                    listContainer.style.gridTemplateRows = 'repeat(5, auto)';
+                } else { // Màn dọc
+                    listContainer.style.gridTemplateColumns = '1fr';
+                    listContainer.style.gridAutoFlow = 'row';
+                    listContainer.style.gridTemplateRows = 'auto';
+                }
+            }
         }
 
-        if (this.winnerOverlay) {
-            this.winnerOverlay.setPosition(cx, cy);
-            this.winnerOverlay.setSize(w, h);
+        // Layout Progress Bar (nếu đang vẽ)
+        if (this.progressGraphics) {
+            // Gọi lại update để vẽ lại đúng vị trí mới
+            // (Giá trị progress được lưu trong Graphics không truy xuất lại được dễ dàng, 
+            // nên ta chờ lần update tiếp theo từ server hoặc redraw tạm)
+            this.progressGraphics.clear();
         }
-        if (this.winnerContainer) {
-            this.winnerContainer.setPosition(cx, cy);
+
+        if (this.finishRankText) {
+            this.finishRankText.setPosition(cx, cy - 100);
         }
     }
 
-    isWinnerOpen() {
-        return !!(this.winnerOverlay || this.winnerContainer);
-    }
-
-    showPlayerNameInput(onJoin, onHostClick) {
+    showPlayerNameInput(onJoin) {
         const { cx, cy } = this._getLayout();
-
         const dom = this.scene.add.dom(cx, cy).createFromHTML(`
-      <div style="text-align:center">
-        <div style="color:#5dfc9b;font-family:monospace;font-size:32px;margin-bottom:10px">
-          ENTER NAME
-        </div>
-        <input id="playerName" type="text" style="${PIXEL_INPUT_STYLE}" />
-        <br/><br/>
-        <div style="display: flex; gap: 10px; justify-content: center;">
-            <button id="joinBtn" style="${PIXEL_BTN_STYLE}">JOIN</button>
-            <button id="hostBtn" style="${PIXEL_BTN_STYLE}; background: #444;">HOST</button>
-        </div>
-      </div>
-    `).setDepth(DEPTH.UI).setScrollFactor(0);
+          <div style="text-align:center">
+            <div style="color:#5dfc9b;font-family:monospace;font-size:32px;margin-bottom:10px">
+              ENTER NAME
+            </div>
+            <input id="playerName" type="text" style="${PIXEL_INPUT_STYLE}" />
+            <br/><br/>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="joinBtn" style="${PIXEL_BTN_STYLE}">JOIN</button>
+            </div>
+          </div>
+        `).setDepth(DEPTH.UI).setScrollFactor(0);
 
         this.playerNameDom = dom;
-
         dom.addListener('click');
         dom.on('click', (e) => {
             if (e.target.id === 'joinBtn') {
@@ -171,13 +179,7 @@ export default class UIManager {
                 window.scrollTo(0, 0);
                 onJoin?.(name);
             }
-
-            if (e.target.id === 'hostBtn') {
-                this.destroyPlayerNameInput();
-                onHostClick?.();
-            }
         });
-
         this.layout();
     }
 
@@ -188,27 +190,24 @@ export default class UIManager {
         }
     }
 
-    showHostPasswordInput(onConfirm, onBackToPlayer) {
+    showHostPasswordInput(onConfirm) {
         const { cx } = this._getLayout();
-
         const dom = this.scene.add.dom(cx, 300).createFromHTML(`
-      <div style="text-align:center">
-        <div style="color:#ff1744;font-family:monospace;font-size:20px;margin-bottom:10px">
-          HOST ACCESS
-        </div>
-        <input id="hostPass" type="password" style="${PIXEL_INPUT_STYLE}" />
-        <br/><br/>
-        <button id="hostBtn" style="${PIXEL_BTN_STYLE}">CONFIRM</button>
-        <button id="backBtn" style="${PIXEL_BTN_STYLE}; background: #444;">PLAYER</button>
-        <div id="error"
-          style="color:#ff1744;font-family:monospace;font-size:14px;margin-top:8px;display:none">
-          INVALID PASSWORD
-        </div>
-      </div>
-    `).setDepth(DEPTH.UI).setScrollFactor(0);
+          <div style="text-align:center">
+            <div style="color:#ff1744;font-family:monospace;font-size:20px;margin-bottom:10px">
+              HOST ACCESS
+            </div>
+            <input id="hostPass" type="password" style="${PIXEL_INPUT_STYLE}" />
+            <br/><br/>
+            <button id="hostBtn" style="${PIXEL_BTN_STYLE}">CONFIRM</button>
+            <div id="error"
+              style="color:#ff1744;font-family:monospace;font-size:14px;margin-top:8px;display:none">
+              INVALID PASSWORD
+            </div>
+          </div>
+        `).setDepth(DEPTH.UI).setScrollFactor(0);
 
         this.hostPassDom = dom;
-
         dom.addListener('click');
         dom.on('click', (e) => {
             if (e.target.id === 'hostBtn') {
@@ -216,13 +215,7 @@ export default class UIManager {
                 if (!pass) return;
                 onConfirm?.(pass);
             }
-
-            if (e.target.id === 'backBtn') {
-                this.destroyHostPasswordInput();
-                onBackToPlayer?.();
-            }
         });
-
         this.layout();
     }
 
@@ -241,16 +234,11 @@ export default class UIManager {
 
     showWaitingText() {
         if (this.waitingText) return;
-
         const { cx } = this._getLayout();
-
         this.waitingText = this.scene.add.text(
-            cx,
-            300,
-            'Waiting to start...',
+            cx, 300, 'Waiting to start...',
             { fontSize: '28px', fontFamily: 'monospace', color: '#ffffff' }
         ).setOrigin(0.5).setDepth(DEPTH.UI);
-
         this.layout();
     }
 
@@ -264,8 +252,9 @@ export default class UIManager {
     showStartButton(onStart) {
         if (this.startButton) return;
 
-        const { cx } = this._getLayout();
+        const { cx, h } = this._getLayout();
 
+        // Nút Start nằm ở h - 80
         const btnBg = this.scene.add.graphics()
             .fillStyle(0x00c853, 1).lineStyle(4, 0x008a39, 1)
             .fillRoundedRect(-100, -40, 200, 80, 5)
@@ -280,7 +269,7 @@ export default class UIManager {
             color: '#ffffff'
         }).setOrigin(0.5);
 
-        this.startButton = this.scene.add.container(cx, 300, [btnBg, btnText])
+        this.startButton = this.scene.add.container(cx, h - 80, [btnBg, btnText])
             .setScrollFactor(0)
             .setSize(200, 80)
             .setInteractive({ useHandCursor: true })
@@ -288,7 +277,8 @@ export default class UIManager {
 
         this.startButton.on('pointerdown', () => onStart?.());
 
-        this.layout();
+        // Đảm bảo nút Start luôn nằm trên cùng (UI depth cao)
+        this.scene.children.bringToTop(this.startButton);
     }
 
     destroyStartButton() {
@@ -302,18 +292,22 @@ export default class UIManager {
         const gameCanvas = this.scene.game.canvas;
         const parent = gameCanvas.parentElement;
         if (!parent) return;
-
         parent.querySelectorAll('.phaser-dom-element').forEach(el => el.remove());
     }
 
     clearBeforeCountdown() {
         this.clearAllDomElements();
-
         this.destroyPlayerNameInput();
         this.destroyHostPasswordInput();
         this.destroyWaitingText();
         this.destroyStartButton();
         this.destroyWinner();
+        this.destroySpectatorText();
+
+        // Reset progress bar
+        if (this.progressGraphics) {
+            this.progressGraphics.clear();
+        }
     }
 
     startCountdown() {
@@ -328,14 +322,11 @@ export default class UIManager {
         const { cx } = this._getLayout();
 
         const txt = this.scene.add.text(
-            cx,
-            200,
-            timeLeft.toString(),
+            cx, 200, timeLeft.toString(),
             { fontSize: '96px', fontStyle: 'bold', color: '#ff1744' }
         ).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH.UI);
 
         this.countdownText = txt;
-
         this.layout();
 
         this.scene.time.addEvent({
@@ -347,7 +338,6 @@ export default class UIManager {
                     txt.setText(timeLeft.toString());
                     return;
                 }
-
                 txt.setText('GO!');
                 this.state.isRaceStarted = true;
                 this.state.isCountdownRunning = false;
@@ -362,57 +352,177 @@ export default class UIManager {
         });
     }
 
+    showSpectatorMode() {
+        // 1. QUAN TRỌNG: Xóa sạch giao diện nhập tên trước
+        this.destroyPlayerNameInput();
+        this.destroyHostPasswordInput();
+        this.destroyStartButton();
+        this.destroyWaitingText();
+        this.destroyWinner();
+
+        const { cx, cy } = this._getLayout();
+
+        // 2. Hiển thị thông báo (Thêm background đen mờ phía sau text để dễ đọc hơn)
+        this.spectatorText = this.scene.add.text(cx, cy, "GAME IN PROGRESS\nSPECTATOR MODE", {
+            fontSize: '32px',
+            fontFamily: 'monospace',
+            color: '#ffff00',
+            align: 'center',
+            stroke: '#000',
+            strokeThickness: 4,
+            backgroundColor: 'rgba(0,0,0,0.5)' // Thêm nền mờ
+        }).setOrigin(0.5).setDepth(DEPTH.UI).setScrollFactor(0);
+
+        // 3. Vẫn cho phép vẽ thanh Progress Bar (để người xem biết tiến độ)
+        // Gọi updateProgressBar với giá trị 0 ban đầu, sau đó nó sẽ tự update theo socket
+        this.updateProgressBar(0, 0);
+    }
+
+    destroySpectatorText() {
+        if (this.spectatorText) {
+            this.spectatorText.destroy();
+            this.spectatorText = null;
+        }
+    }
+
     showHostLeaderboard() {
         if (this.hostLeaderboardDom) return;
 
-        this.hostLeaderboardDom = this.scene.add.dom(0, 0).createFromHTML(`
-    <div id="unified-leaderboard" style="${LEADERBOARD_CONTAINER_STYLE}">
-        <div style="display: flex; justify-content: center; align-items: center; border-bottom: 2px solid #ffeb3b; margin-bottom: 10px; padding-bottom: 5px;">
-            <h2 style="color:#ffeb3b; margin:0; font-size:18px; font-family: 'Courier New', monospace;">
-                LEADERBOARD
-            </h2>
-            <button id="restartBtn" style="${REFRESH_BTN_STYLE}" title="Reset Race">
-                ↻
-            </button>
+        const { cx, cy } = this._getLayout();
+
+        // Tạo DOM
+        this.hostLeaderboardDom = this.scene.add.dom(cx, cy - 50).createFromHTML(`
+        <div id="unified-leaderboard" style="${LEADERBOARD_CONTAINER_STYLE}">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffeb3b; margin-bottom: 15px; padding-bottom: 10px;">
+                <h2 style="color:#ffeb3b; margin:0; font-size:24px; font-family: 'Courier New', monospace;">
+                    LEADERBOARD
+                </h2>
+                <button id="restartBtn" style="${REFRESH_BTN_STYLE}" title="Reset Race">
+                    <span>↻</span>
+                </button>
+            </div>
+            
+            <div style="flex: 1; overflow-y: auto; padding-right: 5px;">
+                <div id="leaderboard-list" style="
+                    display: grid; 
+                    gap: 10px 40px; 
+                    width: 100%;
+                "></div>
+            </div>
+
+            <div id="leaderboard-footer" style="
+                margin-top: 15px;
+                padding-top: 10px;
+                border-top: 1px dashed #5dfc9b;
+                text-align: center;
+                color: #aaa;
+                font-style: italic;
+                display: none; 
+            ">
+                ... and others
+            </div>
         </div>
-        <div id="leaderboard-list"></div>
-    </div>
-    `).setScrollFactor(0).setDepth(DEPTH.UI + 10);
+        `).setScrollFactor(0).setDepth(DEPTH.UI + 10);
 
         this.hostLeaderboardDom.addListener('click');
         this.hostLeaderboardDom.on('click', (e) => {
-            if (e.target.id === 'restartBtn') {
-                e.target.style.transform = 'rotate(180deg)';
-                setTimeout(() => { e.target.style.transform = 'rotate(0deg)'; }, 200);
-
+            const btn = e.target.closest('#restartBtn');
+            if (btn) {
+                btn.style.transform = 'rotate(180deg)';
+                setTimeout(() => { btn.style.transform = 'rotate(0deg)'; }, 300);
                 this.scene.events.emit('restartRequested');
             }
         });
 
+        // FIX: Gọi update lần đầu tiên với danh sách rỗng để hiện text "Waiting..." ngay lập tức
+        this.updateHostLeaderboard([], 0);
+
         this.layout();
     }
 
-    updateHostLeaderboard(sortedPlayers) {
+    updateHostLeaderboard(contributors, totalPlayers = 0) {
         if (!this.hostLeaderboardDom) return;
-
         const listContainer = this.hostLeaderboardDom.getChildByID('leaderboard-list');
+        const footer = this.hostLeaderboardDom.getChildByID('leaderboard-footer');
         if (!listContainer) return;
 
-        const finishedData = this.state.finishedPlayers || [];
-        const top10 = sortedPlayers.slice(0, 10);
+        if (!contributors || contributors.length === 0) {
+            listContainer.innerHTML = '<div style="color:#aaa; text-align:center; grid-column: 1 / -1; margin-top: 20px;">Waiting for players to join...</div>';
+            footer.style.display = 'none';
+            return;
+        }
 
-        listContainer.innerHTML = top10.map((player, index) => {
-            const finishEntry = finishedData.find(f => f.id === player.id);
-            const timeText = finishEntry ? `<span style="color:#ffeb3b; font-size:12px;">${finishEntry.finishTime}s</span>` : '';
-            const isFirst = index === 0;
+        listContainer.innerHTML = contributors.map((p, index) => {
+            let rankColor = '#5dfc9b';
+            let icon = '';
+            if (index === 0) { rankColor = '#ffeb3b'; icon = '👑 '; }
+            else if (index === 1) { rankColor = '#c0c0c0'; }
+            else if (index === 2) { rankColor = '#cd7f32'; }
 
             return `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 14px; color: ${isFirst ? '#ffeb3b' : '#5dfc9b'}">
-                <span>#${index + 1} ${player.name.substring(0, 8)}</span>
-                ${timeText}
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                    <span style="color:${rankColor}; font-weight: bold; width: 30px;">#${index + 1}</span>
+                    <span style="color:#ffffff; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${icon}${p.name || 'Unknown'}</span>
+                </div>
+                <span style="color:#5dfc9b; font-family: monospace; font-weight: bold;">${p.taps}</span>
             </div>
-        `;
+            `;
         }).join('');
+
+        if (totalPlayers > 10) {
+            const othersCount = totalPlayers - 10;
+            footer.style.display = 'block';
+            footer.innerText = `+ ${othersCount} other racer${othersCount > 1 ? 's' : ''} competing...`;
+        } else {
+            footer.style.display = 'none';
+        }
+    }
+
+    updateProgressBar(progress, speed) {
+        // 1. CHẶN VẼ NẾU CHƯA START GAME
+        // Nếu chưa Start và chưa Finish (tức là đang Lobby hoặc Countdown) thì không hiện
+        if (!this.state.isRaceStarted && !this.state.isFinished) {
+            // Nếu lỡ vẽ rồi thì xóa đi
+            if (this.progressGraphics) {
+                this.progressGraphics.clear();
+            }
+            return;
+        }
+
+        // Nếu graphics chưa tạo thì tạo mới
+        if (!this.progressGraphics) {
+            this.progressGraphics = this.scene.add.graphics().setScrollFactor(0).setDepth(100);
+        }
+
+        this.progressGraphics.clear();
+
+        const { cx, h } = this._getLayout();
+
+        // Vị trí đặt trùng với vị trí nút START (h - 80)
+        const yPos = h - 80;
+
+        // Kích thước thon gọn
+        const width = 300;
+        const height = 20;
+        const radius = 10;
+
+        // Vẽ nền (Background màu xám tối)
+        this.progressGraphics.fillStyle(0x222222, 1);
+        this.progressGraphics.fillRoundedRect(cx - width / 2, yPos - height / 2, width, height, radius);
+
+        // Viền nhẹ cho nền
+        this.progressGraphics.lineStyle(2, 0x005c30, 0.5);
+        this.progressGraphics.strokeRoundedRect(cx - width / 2, yPos - height / 2, width, height, radius);
+
+        // Vẽ phần Fill
+        if (progress > 0) {
+            const fillWidth = Math.max(radius * 2, width * progress);
+            if (fillWidth > 0) {
+                this.progressGraphics.fillStyle(0x00c853, 1);
+                this.progressGraphics.fillRoundedRect(cx - width / 2, yPos - height / 2, fillWidth, height, radius);
+            }
+        }
     }
 
     destroyWinner() {
@@ -424,18 +534,11 @@ export default class UIManager {
 
     showLocalFinishRank(rank) {
         const { cx, cy } = this._getLayout();
-
         if (this.finishRankText) this.finishRankText.destroy();
-
         this.finishRankText = this.scene.add.text(
             cx, cy - 100,
             `YOU FINISHED!\nRANK: ${rank}`,
-            {
-                fontSize: '32px',
-                fontFamily: 'monospace',
-                color: '#003b1f',
-                align: 'center',
-            }
+            { fontSize: '32px', fontFamily: 'monospace', color: '#003b1f', align: 'center' }
         ).setOrigin(0.5).setDepth(DEPTH.UI).setScrollFactor(0);
     }
 }

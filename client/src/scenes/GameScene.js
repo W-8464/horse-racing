@@ -11,7 +11,6 @@ export default class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
 
-        // state chung (thay cho việc GameScene ôm cả đống field)
         this.state = {
             role: null,
             isFinished: false,
@@ -30,6 +29,7 @@ export default class GameScene extends Phaser.Scene {
     }
 
     preload() {
+        // ... (Giữ nguyên phần preload giống code cũ)
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;
 
@@ -40,11 +40,10 @@ export default class GameScene extends Phaser.Scene {
             style: { font: '20px Arial', fill: '#ffffff' }
         }).setOrigin(0.5, 0.5);
 
+        const progressBar = this.add.graphics();
         const progressBox = this.add.graphics();
         progressBox.fillStyle(0x222222, 0.8);
         progressBox.fillRect(width / 2 - 160, height / 2, 320, 50);
-
-        const progressBar = this.add.graphics();
 
         this.load.on('progress', (value) => {
             progressBar.clear();
@@ -58,22 +57,11 @@ export default class GameScene extends Phaser.Scene {
             loadingText.destroy();
         });
 
-        this.load.spritesheet('horse', 'assets/images/horse-run.png', {
-            frameWidth: 384,
-            frameHeight: 270
-        });
-
-        this.load.spritesheet('idle', 'assets/images/horse-idle.png', {
-            frameWidth: 384,
-            frameHeight: 270
-        });
-
+        this.load.spritesheet('horse', 'assets/images/horse-run.png', { frameWidth: 384, frameHeight: 270 });
+        this.load.spritesheet('idle', 'assets/images/horse-idle.png', { frameWidth: 384, frameHeight: 270 });
         this.load.image('lantern', 'assets/images/light.png');
         this.load.image('flash_icon', 'assets/images/flash.png');
-
-        // Nhạc nền (BGM)
         this.load.audio('bgm', 'assets/sounds/background_music.mp3');
-        // Hiệu ứng âm thanh (SFX)
         this.load.audio('countdown_full', 'assets/sounds/countdown.mp3');
         this.load.audio('gallop', 'assets/sounds/gallop.mp3');
         this.load.audio('audience', 'assets/sounds/audience.mp3');
@@ -81,66 +69,109 @@ export default class GameScene extends Phaser.Scene {
     }
 
     create() {
-        // environment
+        // 1. Tạo môi trường và ngựa như bình thường (để tránh lỗi null reference)
         this.env = new EnvironmentManager(this);
         this.env.createPixelTextures();
-
         const initialWorldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT || 720, this.scale.height);
         this.env.setupWorld(initialWorldHeight);
 
-        this.env.drawCheckeredLine(GAME_SETTINGS.START_LINE_X);
-        this.env.drawCheckeredLine(GAME_SETTINGS.FINISH_LINE_X);
-
-        // sounds
-        this.state.sounds.bgm = this.sound.add('bgm', { loop: true, volume: 0.5 });
-        this.state.sounds.countdown = this.sound.add('countdown_full');
-        this.state.sounds.gallop = this.sound.add('gallop', { loop: true });
-        this.state.sounds.audience = this.sound.add('audience', { loop: true });
-        this.state.sounds.finish = this.sound.add('finish_sound');
-
-        this.state.sounds.bgm.play();
-
-        // anims
         this.createAnimations();
 
-        // managers
+        // Managers
         this.players = new PlayerManager(this, this.state);
         this.players.init();
 
-        this.ui = new UIManager(this, this.state);
+        this.ui = new UIManager(this, this.state); // UI sẽ nằm đè lên trên cùng
 
         this.network = new NetworkManager(this, this.state, this.players, this.ui);
         this.network.init();
 
         this.flashSkill = new FlashSkillManager(this, this.state, this.players, this.network);
-
         this.inputs = new InputManager(this, this.state, this.players, this.network, this.flashSkill, this.ui);
         this.inputs.init();
 
-        this.setupResizeHandler();
+        // Sounds
+        this.state.sounds.bgm = this.sound.add('bgm', { loop: true, volume: 0.5 });
+        this.state.sounds.countdown = this.sound.add('countdown_full');
+        this.state.sounds.gallop = this.sound.add('gallop', { loop: true });
+        this.state.sounds.audience = this.sound.add('audience', { loop: true });
+        this.state.sounds.finish = this.sound.add('finish_sound');
+        this.state.sounds.bgm.play();
 
+        this.setupResizeHandler();
         this.setupRestartHandler();
 
+        // Gọi UI
         this.showInitialUI();
     }
 
+    // --- LOGIC MỚI: Chuyển Host sang màn hình Admin (Màn đen) ---
+    setupHostView() {
+        // 1. Đặt background camera màu đen
+        this.cameras.main.setBackgroundColor('#000000');
+
+        // 2. Tạo một hình chữ nhật đen che phủ toàn bộ thế giới game
+        // (Đặt depth thấp hơn UI nhưng cao hơn Environment/Horse)
+        // Giả sử UI depth >= 100, Game depth <= 10
+        const cover = this.add.rectangle(0, 0, 100000, 100000, 0x000000)
+            .setScrollFactor(0)
+            .setDepth(50); // Che hết các object có depth < 50
+    }
+
+    showInitialUI() {
+        const path = window.location.pathname;
+
+        if (path.includes('/host')) {
+            // --- GIAO DIỆN HOST ---
+            this.handleFullScreen();
+
+            // Kích hoạt chế độ màn hình đen cho Host
+            this.setupHostView();
+
+            this.ui.showHostPasswordInput(
+                (password) => {
+                    this.state.role = 'host';
+                    this.network.selectRoleHost(password);
+                }
+            );
+        } else {
+            // --- GIAO DIỆN PLAYER ---
+            this.ui.showPlayerNameInput(
+                (name) => {
+                    this.handleFullScreen();
+                    this.state.role = 'player';
+                    this.network.selectRolePlayer(name);
+                    this.ui.showWaitingText();
+                }
+            );
+        }
+    }
+
+    update(time, delta) {
+        if (window.innerHeight > window.innerWidth) return;
+
+        // HOST: Không update visual ngựa
+        if (this.state.role === 'host') return;
+
+        // PLAYER và SPECTATOR: Đều update visual ngựa
+        // Nếu role là spectator, this.players vẫn tồn tại (được init ở create)
+        if (this.players) {
+            const progress = this.state.progress || 0;
+            // Spectator không gửi tap, nhưng vẫn nhận progress từ server để ngựa chạy
+            this.players.updateSharedHorse(progress, 0);
+        }
+    }
+
     setupResizeHandler() {
-        // layout ngay lúc init
         this.handleResize({ width: this.scale.width, height: this.scale.height });
-
         this.scale.on('resize', this.handleResize, this);
-
-        // cleanup
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.scale.off('resize', this.handleResize, this);
         });
     }
 
     setupRestartHandler() {
-        // chỉ host mới được yêu cầu restart
         this.events.on('restartRequested', this.handleRestartRequested, this);
-
-        // cleanup
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.events.off('restartRequested', this.handleRestartRequested, this);
         });
@@ -148,54 +179,42 @@ export default class GameScene extends Phaser.Scene {
 
     handleRestartRequested() {
         if (this.state.role !== 'host') return;
-
-        // Ưu tiên gọi method nếu NetworkManager có expose
         if (this.network?.requestRestart) {
             this.network.requestRestart();
             return;
         }
-
-        // fallback: nếu NetworkManager expose socket
         if (this.network?.socket) {
             this.network.socket.emit('hostRestartGame');
             return;
         }
-
-        console.warn('[restart] Cannot find socket/requestRestart in NetworkManager');
     }
 
     handleResize(gameSize) {
         const width = gameSize.width;
         const height = gameSize.height;
-
         const cam = this.cameras.main;
-
         const baseW = GAME_SETTINGS.DESIGN_WIDTH || 1560;
         const baseH = GAME_SETTINGS.DESIGN_HEIGHT || 720;
-        const rawZoom = Math.min(width / baseW, height / baseH);
-        const zoom = Phaser.Math.Clamp(rawZoom, 0.45, 1);
 
-        cam.setViewport(0, 0, width, height);
-        cam.setSize(width, height);
-        //cam.setZoom(zoom);
-        //const worldHeight = Math.max(baseH, height / zoom);
-        const worldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT || 720, height);
-        cam.setBounds(0, 0, GAME_SETTINGS.WORLD_WIDTH, worldHeight);
-
-        this.env?.resize(worldHeight);
+        // Host không cần zoom track, chỉ cần UI
+        if (this.state.role === 'host') {
+            cam.setViewport(0, 0, width, height);
+            cam.setSize(width, height);
+            cam.setScroll(0, 0); // Reset scroll về 0,0 để UI căn giữa
+        } else {
+            const rawZoom = Math.min(width / baseW, height / baseH);
+            const zoom = Phaser.Math.Clamp(rawZoom, 0.45, 1);
+            cam.setViewport(0, 0, width, height);
+            cam.setSize(width, height);
+            const worldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT || 720, height);
+            cam.setBounds(0, 0, GAME_SETTINGS.WORLD_WIDTH, worldHeight);
+            this.env?.resize(worldHeight);
+        }
 
         this.ui?.layout();
     }
 
     createAnimations() {
-        // if (!this.anims.exists('horse_run')) {
-        //     this.anims.create({
-        //         key: 'horse_run',
-        //         frames: this.anims.generateFrameNumbers('horse', { start: 4, end: 7 }),
-        //         frameRate: 6,
-        //         repeat: -1
-        //     });
-        // }
         if (!this.anims.exists('horse_run')) {
             this.anims.create({
                 key: 'horse_run',
@@ -218,54 +237,5 @@ export default class GameScene extends Phaser.Scene {
         if (!this.scale.isFullscreen) {
             this.scale.startFullscreen();
         }
-    }
-
-    showInitialUI() {
-        this.ui.showPlayerNameInput(
-            (name) => {
-                this.handleFullScreen();
-                this.state.role = 'player';
-                this.network.selectRolePlayer(name);
-                this.ui.showWaitingText();
-            },
-            () => {
-                this.handleFullScreen();
-                this.ui.showHostPasswordInput(
-                    (password) => {
-                        this.state.role = 'host';
-                        this.network.selectRoleHost(password);
-                    },
-                    () => {
-                        this.showInitialUI();
-                    }
-                );
-            }
-        );
-    }
-
-    update(time) {
-        if (this.players && this.network) {
-            this.players.updateAllPositions(this.network);
-
-            if (this.state.role === 'host' && !this.state.isFinished) {
-                if (!this.lastLeaderboardUpdate || time - this.lastLeaderboardUpdate > 200) {
-                    const allHorses = [...this.players.otherPlayers.getChildren()];
-                    if (this.players.horse) allHorses.push(this.players.horse);
-
-                    const sortedData = allHorses.map(h => ({
-                        id: h.playerId,
-                        name: h.playerName || 'Guest',
-                        x: h.x,
-                        horseColor: h.baseColor
-                    }));
-
-                    sortedData.sort((a, b) => b.x - a.x);
-
-                    this.ui.updateHostLeaderboard(sortedData);
-                    this.lastLeaderboardUpdate = time;
-                }
-            }
-        }
-        this.players?.updateHostCameraFollow();
     }
 }
