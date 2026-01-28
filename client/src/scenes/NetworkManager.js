@@ -30,15 +30,10 @@ export default class NetworkManager {
     bindListeners() {
         this.socket.on('initialState', (status) => {
             if (this.state.role !== 'host' && status !== 'LOBBY') {
-                console.log('Game đang chạy, chuyển sang chế độ khán giả');
-
                 this.state.role = 'spectator';
-
-                // QUAN TRỌNG: Nếu game đang chạy hoặc đếm ngược, phải set state để ngựa chạy
                 if (status === 'RUNNING') {
                     this.state.isRaceStarted = true;
                 }
-
                 this.ui.showSpectatorMode();
             }
         });
@@ -49,6 +44,7 @@ export default class NetworkManager {
             this.ui.showSpectatorMode();
         });
 
+        // 1. CHỈ GIỮ LẠI gameUpdateFast (Xóa gameStateUpdate cũ)
         this.socket.on('gameUpdateFast', (data) => {
             this.state.progress = data.p;
             this.ui.updateProgressBar(data.p, 0);
@@ -66,48 +62,41 @@ export default class NetworkManager {
         });
 
         this.socket.on('raceReset', (data) => {
-            // Data nhận về: { players: [], totalPlayers: 0 }
-
-            // 1. Reset State
             this.state.progress = 0;
             this.state.speed = 0;
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
-            this.state.finishedPlayers = [];
 
-            // 2. Reset UI chung
             this.ui.destroyWinner();
             this.ui.destroyStartButton();
             this.ui.destroyWaitingText();
             this.ui.updateProgressBar(0, 0);
             this.ui.destroySpectatorText();
 
-            // Reset Ngựa
             this.players.resetSharedHorse();
 
-            // Reset Âm thanh
+            if (this.scene.env) {
+                this.scene.env.stopFireworks();
+            }
+
+            // Reset âm thanh
             if (!this.scene.state.sounds.bgm.isPlaying) {
                 this.scene.state.sounds.bgm.play();
             }
             this.scene.state.sounds.gallop.stop();
             this.scene.state.sounds.audience.stop();
+            this.scene.state.sounds.finish.stop(); // Stop nhạc finish nếu đang chạy
 
-            // 3. UI RIÊNG CHO TỪNG ROLE
             if (this.state.role === 'host') {
-                // Cập nhật Leaderboard ngay lập tức với điểm số 0
                 this.ui.updateHostLeaderboard(data.players, data.totalPlayers);
-
-                // Hiện lại nút Start
                 this.ui.showStartButton(() => this.hostStartGame());
             }
 
             if (this.state.role === 'player') {
-                // Hiện lại chữ Waiting cho Player
                 this.ui.showWaitingText();
             }
 
             if (this.state.role === 'spectator') {
-                // Chuyển role về null hoặc player để cho phép nhập tên lại
                 this.state.role = null;
                 this.ui.showPlayerNameInput((name) => {
                     this.scene.handleFullScreen();
@@ -155,44 +144,33 @@ export default class NetworkManager {
             });
         });
 
-        // XỬ LÝ KẾT THÚC GAME
+        // 2. CẬP NHẬT XỬ LÝ KẾT THÚC
         this.socket.on('raceFinished', (data) => {
             this.state.isFinished = true;
             this.state.isRaceStarted = false;
             this.players.updateSharedHorse(1, 0);
 
+            // Dừng các âm thanh nền
             this.scene.state.sounds.audience.stop();
             this.scene.state.sounds.gallop.stop();
-            if (!this.scene.state.sounds.bgm.isPlaying) {
-                this.scene.state.sounds.bgm.play();
+            this.scene.state.sounds.bgm.stop();
+            this.scene.state.sounds.finish.play();
+
+            if (this.scene.env) {
+                this.scene.env.launchFireworks();
             }
 
             if (this.state.role === 'host') {
                 this.ui.updateHostLeaderboard(data.topContributors || [], data.totalPlayers || 0);
+            }
+            else if (this.state.role === 'player' || this.state.role === 'spectator') {
+                this.ui.showFinishText();
             }
         });
 
         this.socket.on('forceReload', () => {
             window.location.reload();
         });
-    }
-
-    getInterpolatedState() {
-        const renderTime = Date.now() - this.bufferDelay;
-
-        // Cần ít nhất 2 gói tin để nội suy
-        if (this.renderBuffer.length < 2) return null;
-
-        // Tìm 2 gói tin bao quanh renderTime
-        for (let i = 0; i < this.renderBuffer.length - 1; i++) {
-            const b0 = this.renderBuffer[i];
-            const b1 = this.renderBuffer[i + 1];
-
-            if (renderTime >= b0.ts && renderTime <= b1.ts) {
-                return { b0, b1, renderTime };
-            }
-        }
-        return null;
     }
 
     // emits

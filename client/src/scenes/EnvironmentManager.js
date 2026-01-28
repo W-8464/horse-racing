@@ -7,22 +7,29 @@ export default class EnvironmentManager {
         this.baseHeight = GAME_SETTINGS.DESIGN_HEIGHT;
         this.skyHeight = 110;
         this.worldHeight = this.baseHeight;
+
         this.grass = null;
         this.sky = null;
         this.mist = null;
-        this._cloudsCreated = false;
-        this._lanternsCreated = false;
+
+        this._texturesCreated = false;
+        this._staticObjectsCreated = false;
+
+        // Mảng chứa các emitter pháo hoa đang hoạt động để quản lý/xóa
+        this.activeFireworks = [];
+        this.fireworkTimer = null;
     }
 
     createPixelTextures() {
-        // ✅ Guard tránh tạo lại
+        if (this._texturesCreated) return;
+
+        // 1. Texture Cỏ
         if (!this.scene.textures.exists('grassPixel')) {
             const grassCanvas = this.scene.textures.createCanvas('grassPixel', 64, 128);
             const ctx = grassCanvas.context;
             const grd = ctx.createLinearGradient(0, 0, 0, 128);
             grd.addColorStop(0, '#5da139');
             grd.addColorStop(1, '#73bd4d');
-
             ctx.fillStyle = grd;
             ctx.fillRect(0, 0, 64, 128);
 
@@ -37,6 +44,7 @@ export default class EnvironmentManager {
             grassCanvas.refresh();
         }
 
+        // 2. Texture Mây
         if (!this.scene.textures.exists('cloudPixel')) {
             const cloudCanvas = this.scene.textures.createCanvas('cloudPixel', 48, 24);
             const cCtx = cloudCanvas.context;
@@ -47,6 +55,17 @@ export default class EnvironmentManager {
             cCtx.fillRect(8, 18, 32, 3);
             cloudCanvas.refresh();
         }
+
+        // 3. Texture Hạt Pháo Hoa (Chấm trắng)
+        if (!this.scene.textures.exists('particle_pixel')) {
+            const graphics = this.scene.make.graphics({ x: 0, y: 0, add: false });
+            graphics.fillStyle(0xffffff, 1);
+            graphics.fillRect(0, 0, 4, 4);
+            graphics.generateTexture('particle_pixel', 4, 4);
+            graphics.destroy();
+        }
+
+        this._texturesCreated = true;
     }
 
     setupWorld(initialWorldHeight) {
@@ -56,6 +75,7 @@ export default class EnvironmentManager {
         this.scene.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
         this.scene.physics.world.setBounds(0, this.skyHeight, this.worldWidth, this.worldHeight - this.skyHeight);
 
+        // Vẽ Bầu trời
         if (!this.sky) {
             const sky = this.scene.add.graphics();
             sky.fillGradientStyle(0x87CEEB, 0x87CEEB, 0xbfe9ff, 0xbfe9ff, 1);
@@ -63,44 +83,39 @@ export default class EnvironmentManager {
             this.sky = sky;
         }
 
-        if (!this._cloudsCreated) {
+        // Vẽ Cỏ
+        if (!this.grass) {
+            this.grass = this.scene.add.tileSprite(
+                0, this.skyHeight, this.worldWidth, this.worldHeight - this.skyHeight, 'grassPixel'
+            ).setOrigin(0).setDepth(DEPTH.GRASS);
+        } else {
+            this._resizeGrass();
+        }
+
+        // Vẽ Núi và Sương mù
+        if (!this.mist) {
+            this.drawMountains(this.worldWidth, this.skyHeight);
+            this.mist = this.drawHorizonMist(this.worldWidth);
+        }
+
+        // Tạo object tĩnh (Mây, Đèn lồng)
+        if (!this._staticObjectsCreated) {
             for (let i = 0; i < this.worldWidth; i += 300) {
                 this.scene.add.image(i, 20 + Math.random() * 40, 'cloudPixel')
                     .setScale(1.5 + Math.random())
                     .setAlpha(0.5)
                     .setScrollFactor(0.15);
             }
-            this._cloudsCreated = true;
-        }
-
-        if (!this.grass) {
-            this.grass = this.scene.add.tileSprite(
-                0,
-                this.skyHeight,
-                this.worldWidth,
-                this.worldHeight - this.skyHeight,
-                'grassPixel'
-            )
-                .setOrigin(0)
-                .setDepth(DEPTH.GRASS);
-        } else {
-            this._resizeGrass();
-        }
-
-        if (!this._lanternsCreated) {
             for (let x = 0; x < this.worldWidth; x += 350) {
                 this.scene.add.image(x, -20, 'lantern')
                     .setOrigin(0.5, 0)
                     .setScale(0.35)
                     .setDepth(DEPTH.LANTERN);
             }
-            this._lanternsCreated = true;
+            this._staticObjectsCreated = true;
         }
 
-        if (!this.mist) {
-            this.drawMountains(this.worldWidth, this.skyHeight);
-            this.mist = this.drawHorizonMist(this.worldWidth);
-        }
+        // ĐÃ XÓA: this.drawCheckeredLine(...) - Không hiển thị vạch đích nữa
     }
 
     resize(nextWorldHeight) {
@@ -108,10 +123,8 @@ export default class EnvironmentManager {
         if (newHeight === this.worldHeight) return;
 
         this.worldHeight = newHeight;
-
         this.scene.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
         this.scene.physics.world.setBounds(0, this.skyHeight, this.worldWidth, this.worldHeight - this.skyHeight);
-
         this._resizeGrass();
     }
 
@@ -137,7 +150,6 @@ export default class EnvironmentManager {
                 const drawX = Math.floor(startX / pixelSize) * pixelSize;
                 const drawY = mountainBaseY - py - pixelSize;
                 const drawW = Math.floor(currentWidth / pixelSize) * pixelSize;
-
                 if (drawW > 0) graphics.fillRect(drawX, drawY, drawW, pixelSize);
             }
         }
@@ -150,5 +162,81 @@ export default class EnvironmentManager {
         mist.fillRect(0, this.skyHeight, worldWidth, 80);
         mist.setDepth(DEPTH.GRASS + 0.1).setScrollFactor(1);
         return mist;
+    }
+
+    launchFireworks() {
+        const cam = this.scene.cameras.main;
+        let count = 0;
+
+        // Dừng timer cũ nếu có
+        if (this.fireworkTimer) this.fireworkTimer.remove();
+
+        this.fireworkTimer = this.scene.time.addEvent({
+            delay: 400, // Mỗi 0.4s bắn 1 quả
+            loop: true,
+            callback: () => {
+                // 1. Random vị trí và màu sắc
+                const x = Phaser.Math.Between(cam.width * 0.2, cam.width * 0.8);
+                const y = Phaser.Math.Between(cam.height * 0.2, cam.height * 0.5);
+                const color = Phaser.Utils.Array.GetRandom([0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0x00ffff, 0xff00ff]);
+
+                // 2. Tạo Emitter MỚI cho mỗi quả (Syntax mới của Phaser 3.60)
+                // this.scene.add.particles(x, y, texture, config)
+                const emitter = this.scene.add.particles(x, y, 'particle_pixel', {
+                    speed: { min: 150, max: 350 },
+                    angle: { min: 0, max: 360 },
+                    scale: { start: 2, end: 0 },
+                    alpha: { start: 1, end: 0 },
+                    gravityY: 150,
+                    lifespan: { min: 800, max: 1200 },
+                    quantity: 40,
+                    tint: color,    // Set màu trực tiếp trong config
+                    blendMode: 'ADD',
+                    emitting: false // Không tự bắn liên tục
+                });
+
+                // Set depth cao nhất
+                emitter.setDepth(DEPTH.UI + 100).setScrollFactor(0);
+
+                // 3. Kích hoạt nổ 1 lần
+                emitter.explode(40);
+
+                // 4. Lưu vào mảng để quản lý (nếu cần xóa gấp)
+                this.activeFireworks.push(emitter);
+
+                // 5. Tự hủy sau khi hạt bay hết (2 giây là an toàn)
+                this.scene.time.delayedCall(2000, () => {
+                    if (emitter && emitter.active) {
+                        emitter.destroy();
+                    }
+                    // Xóa khỏi mảng activeFireworks
+                    const index = this.activeFireworks.indexOf(emitter);
+                    if (index > -1) this.activeFireworks.splice(index, 1);
+                });
+
+                // Dừng bắn sau 15 quả
+                count++;
+                if (count >= 15 && this.fireworkTimer) {
+                    this.fireworkTimer.remove();
+                    this.fireworkTimer = null;
+                }
+            }
+        });
+    }
+
+    stopFireworks() {
+        // Dừng bộ đếm bắn
+        if (this.fireworkTimer) {
+            this.fireworkTimer.remove();
+            this.fireworkTimer = null;
+        }
+
+        // Hủy tất cả emitter đang hoạt động ngay lập tức
+        if (this.activeFireworks.length > 0) {
+            this.activeFireworks.forEach(emitter => {
+                if (emitter && emitter.active) emitter.destroy();
+            });
+            this.activeFireworks = [];
+        }
     }
 }

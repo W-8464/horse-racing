@@ -29,22 +29,17 @@ const PIXEL_BTN_STYLE = `
   transition: all 0.1s;
 `;
 
-// SỬA: Giảm max-height xuống 50vh để không che nút Start
 const LEADERBOARD_CONTAINER_STYLE = `
     background: rgba(0, 20, 10, 0.95);
     border: 4px solid #5dfc9b;
     padding: 20px;
     font-family: 'Courier New', monospace;
-    
-    /* Kích thước */
     width: 80vw;
     max-width: 900px;
     height: 50vh;       
     max-height: 500px;
-    
     display: flex;
     flex-direction: column;
-    
     pointer-events: auto;
     box-shadow: 0 0 30px rgba(0,0,0,0.8);
 `;
@@ -80,8 +75,6 @@ export default class UIManager {
         this._ratioCountdownY = 0.35;
 
         this.hostLeaderboardDom = null;
-
-        // Thay đổi: Dùng Graphics thay vì Image/Rect để vẽ bo tròn
         this.progressGraphics = null;
     }
 
@@ -113,7 +106,6 @@ export default class UIManager {
             this.waitingText.setFontSize(Math.round(28 * clampedScale));
         }
 
-        // Vị trí nút Start: Cách đáy 80px
         if (this.startButton) {
             this.startButton.setPosition(cx, h - 80);
         }
@@ -124,16 +116,14 @@ export default class UIManager {
         }
 
         if (this.hostLeaderboardDom) {
-            // SỬA: Đẩy Leaderboard lên cao hơn một chút (cy - 50) để tránh đè nút Start
             this.hostLeaderboardDom.setPosition(cx, cy - 50);
-
             const listContainer = this.hostLeaderboardDom.getChildByID('leaderboard-list');
             if (listContainer) {
-                if (w > h) { // Màn ngang
+                if (w > h) {
                     listContainer.style.gridTemplateColumns = '1fr 1fr';
                     listContainer.style.gridAutoFlow = 'column';
                     listContainer.style.gridTemplateRows = 'repeat(5, auto)';
-                } else { // Màn dọc
+                } else {
                     listContainer.style.gridTemplateColumns = '1fr';
                     listContainer.style.gridAutoFlow = 'row';
                     listContainer.style.gridTemplateRows = 'auto';
@@ -141,11 +131,7 @@ export default class UIManager {
             }
         }
 
-        // Layout Progress Bar (nếu đang vẽ)
         if (this.progressGraphics) {
-            // Gọi lại update để vẽ lại đúng vị trí mới
-            // (Giá trị progress được lưu trong Graphics không truy xuất lại được dễ dàng, 
-            // nên ta chờ lần update tiếp theo từ server hoặc redraw tạm)
             this.progressGraphics.clear();
         }
 
@@ -254,7 +240,6 @@ export default class UIManager {
 
         const { cx, h } = this._getLayout();
 
-        // Nút Start nằm ở h - 80
         const btnBg = this.scene.add.graphics()
             .fillStyle(0x00c853, 1).lineStyle(4, 0x008a39, 1)
             .fillRoundedRect(-100, -40, 200, 80, 5)
@@ -276,8 +261,6 @@ export default class UIManager {
             .setDepth(DEPTH.UI);
 
         this.startButton.on('pointerdown', () => onStart?.());
-
-        // Đảm bảo nút Start luôn nằm trên cùng (UI depth cao)
         this.scene.children.bringToTop(this.startButton);
     }
 
@@ -304,7 +287,6 @@ export default class UIManager {
         this.destroyWinner();
         this.destroySpectatorText();
 
-        // Reset progress bar
         if (this.progressGraphics) {
             this.progressGraphics.clear();
         }
@@ -353,7 +335,6 @@ export default class UIManager {
     }
 
     showSpectatorMode() {
-        // 1. QUAN TRỌNG: Xóa sạch giao diện nhập tên trước
         this.destroyPlayerNameInput();
         this.destroyHostPasswordInput();
         this.destroyStartButton();
@@ -362,7 +343,6 @@ export default class UIManager {
 
         const { cx, cy } = this._getLayout();
 
-        // 2. Hiển thị thông báo (Thêm background đen mờ phía sau text để dễ đọc hơn)
         this.spectatorText = this.scene.add.text(cx, cy, "GAME IN PROGRESS\nSPECTATOR MODE", {
             fontSize: '32px',
             fontFamily: 'monospace',
@@ -370,11 +350,9 @@ export default class UIManager {
             align: 'center',
             stroke: '#000',
             strokeThickness: 4,
-            backgroundColor: 'rgba(0,0,0,0.5)' // Thêm nền mờ
+            backgroundColor: 'rgba(0,0,0,0.5)'
         }).setOrigin(0.5).setDepth(DEPTH.UI).setScrollFactor(0);
 
-        // 3. Vẫn cho phép vẽ thanh Progress Bar (để người xem biết tiến độ)
-        // Gọi updateProgressBar với giá trị 0 ban đầu, sau đó nó sẽ tự update theo socket
         this.updateProgressBar(0, 0);
     }
 
@@ -390,7 +368,6 @@ export default class UIManager {
 
         const { cx, cy } = this._getLayout();
 
-        // Tạo DOM
         this.hostLeaderboardDom = this.scene.add.dom(cx, cy - 50).createFromHTML(`
         <div id="unified-leaderboard" style="${LEADERBOARD_CONTAINER_STYLE}">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffeb3b; margin-bottom: 15px; padding-bottom: 10px;">
@@ -434,9 +411,7 @@ export default class UIManager {
             }
         });
 
-        // FIX: Gọi update lần đầu tiên với danh sách rỗng để hiện text "Waiting..." ngay lập tức
         this.updateHostLeaderboard([], 0);
-
         this.layout();
     }
 
@@ -480,17 +455,13 @@ export default class UIManager {
     }
 
     updateProgressBar(progress, speed) {
-        // 1. CHẶN VẼ NẾU CHƯA START GAME
-        // Nếu chưa Start và chưa Finish (tức là đang Lobby hoặc Countdown) thì không hiện
         if (!this.state.isRaceStarted && !this.state.isFinished) {
-            // Nếu lỡ vẽ rồi thì xóa đi
             if (this.progressGraphics) {
                 this.progressGraphics.clear();
             }
             return;
         }
 
-        // Nếu graphics chưa tạo thì tạo mới
         if (!this.progressGraphics) {
             this.progressGraphics = this.scene.add.graphics().setScrollFactor(0).setDepth(100);
         }
@@ -498,28 +469,21 @@ export default class UIManager {
         this.progressGraphics.clear();
 
         const { cx, h } = this._getLayout();
-
-        // Vị trí đặt trùng với vị trí nút START (h - 80)
         const yPos = h - 80;
-
-        // Kích thước thon gọn
         const width = 300;
         const height = 20;
         const radius = 10;
 
-        // Vẽ nền (Background màu xám tối)
         this.progressGraphics.fillStyle(0x222222, 1);
         this.progressGraphics.fillRoundedRect(cx - width / 2, yPos - height / 2, width, height, radius);
 
-        // Viền nhẹ cho nền
         this.progressGraphics.lineStyle(2, 0x005c30, 0.5);
         this.progressGraphics.strokeRoundedRect(cx - width / 2, yPos - height / 2, width, height, radius);
 
-        // Vẽ phần Fill
         if (progress > 0) {
             const fillWidth = Math.max(radius * 2, width * progress);
             if (fillWidth > 0) {
-                this.progressGraphics.fillStyle(0x00c853, 1);
+                this.progressGraphics.fillStyle(0xe55031, 1);
                 this.progressGraphics.fillRoundedRect(cx - width / 2, yPos - height / 2, fillWidth, height, radius);
             }
         }
@@ -532,13 +496,14 @@ export default class UIManager {
         }
     }
 
-    showLocalFinishRank(rank) {
+    // METHOD MỚI: Hiển thị chữ khi kết thúc
+    showFinishText() {
         const { cx, cy } = this._getLayout();
         if (this.finishRankText) this.finishRankText.destroy();
         this.finishRankText = this.scene.add.text(
             cx, cy - 100,
-            `YOU FINISHED!\nRANK: ${rank}`,
-            { fontSize: '32px', fontFamily: 'monospace', color: '#003b1f', align: 'center' }
+            "MADE BY SE TEAM!",
+            { fontSize: '48px', fontFamily: 'monospace', color: '#5dfc9b', align: 'center', stroke: '#000', strokeThickness: 6 }
         ).setOrigin(0.5).setDepth(DEPTH.UI).setScrollFactor(0);
     }
 }
