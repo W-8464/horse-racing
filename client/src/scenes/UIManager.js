@@ -496,23 +496,24 @@ export default class UIManager {
             }
         }
 
-        // --- THÊM: HIỂN THỊ PHẦN TRĂM BÊN TRONG ---
+        // --- FIX: HIỂN THỊ PHẦN TRĂM ---
         if (!this.progressText) {
             this.progressText = this.scene.add.text(cx, yPos, '', {
-                fontSize: '15px',       // Font vừa phải
+                fontSize: '15px',
                 fontFamily: 'monospace',
                 fontStyle: 'bold',
-                color: '#ffffff',       // Chữ trắng
-                stroke: '#000000',      // Viền đen để nổi trên nền cam/nâu
+                color: '#ffffff',
+                stroke: '#000000',
                 strokeThickness: 3
-            }).setOrigin(0.5, 0.5)      // Căn giữa tâm (Center-Center)
+            }).setOrigin(0.5, 0.5)
                 .setDepth(101)
                 .setScrollFactor(0);
         }
 
+        this.progressText.setPosition(cx, yPos);
+
         const percentage = Math.floor(progress * 100);
         this.progressText.setText(`${percentage}%`);
-        // ------------------------------------------
     }
 
     destroyWinner() {

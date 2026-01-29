@@ -10,8 +10,10 @@ export default class EnvironmentManager {
         this.ground = null;
         this.sky = null;
 
+        this.clouds = [];
+        this.lanterns = [];
+
         this._texturesCreated = false;
-        this._staticObjectsCreated = false;
 
         this.activeFireworks = [];
         this.fireworkTimer = null;
@@ -20,55 +22,39 @@ export default class EnvironmentManager {
     createPixelTextures() {
         if (this._texturesCreated) return;
 
-        // 1. Texture Đất (Giữ nguyên)
         if (!this.scene.textures.exists('groundBlock')) {
             const size = 32;
             const canvas = this.scene.textures.createCanvas('groundBlock', size, size);
             const ctx = canvas.context;
-            ctx.fillStyle = '#8B4513';
-            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = '#8B4513'; ctx.fillRect(0, 0, size, size);
             ctx.fillStyle = '#A0522D';
-            for (let i = 0; i < 10; i++) {
-                const x = Math.random() * size;
-                const y = Math.random() * size;
-                ctx.fillRect(x, y, 2, 2);
-            }
-            ctx.fillStyle = '#5da139';
-            ctx.fillRect(0, 0, size, 8);
-            ctx.fillStyle = '#5da139';
-            for (let i = 0; i < size; i += 4) {
-                if (Math.random() > 0.5) ctx.fillRect(i, 8, 4, 3);
-            }
+            for (let i = 0; i < 10; i++) { ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2); }
+            ctx.fillStyle = '#5da139'; ctx.fillRect(0, 0, size, 8);
+            for (let i = 0; i < size; i += 4) { if (Math.random() > 0.5) ctx.fillRect(i, 8, 4, 3); }
             canvas.refresh();
         }
-
-        // 2. Texture Mây (Giữ nguyên)
         if (!this.scene.textures.exists('cloudPixel')) {
-            const cloudCanvas = this.scene.textures.createCanvas('cloudPixel', 48, 24);
-            const cCtx = cloudCanvas.context;
-            cCtx.fillStyle = '#ffffff';
-            cCtx.fillRect(12, 0, 24, 12);
-            cCtx.fillRect(0, 9, 48, 12);
-            cCtx.fillStyle = '#def2ff';
-            cCtx.fillRect(8, 18, 32, 3);
-            cloudCanvas.refresh();
+            const c = this.scene.textures.createCanvas('cloudPixel', 48, 24);
+            const ctx = c.context;
+            ctx.fillStyle = '#fff'; ctx.fillRect(12, 0, 24, 12); ctx.fillRect(0, 9, 48, 12);
+            ctx.fillStyle = '#def2ff'; ctx.fillRect(8, 18, 32, 3);
+            c.refresh();
         }
-
-        // 3. Texture Hạt Pháo Hoa (Giữ nguyên)
         if (!this.scene.textures.exists('particle_pixel')) {
-            const graphics = this.scene.make.graphics({ x: 0, y: 0, add: false });
-            graphics.fillStyle(0xffffff, 1);
-            graphics.fillRect(0, 0, 4, 4);
-            graphics.generateTexture('particle_pixel', 4, 4);
-            graphics.destroy();
+            const g = this.scene.make.graphics({ x: 0, y: 0, add: false });
+            g.fillStyle(0xffffff, 1); g.fillRect(0, 0, 4, 4);
+            g.generateTexture('particle_pixel', 4, 4);
+            g.destroy();
         }
 
         this._texturesCreated = true;
     }
 
     setupWorld(screenHeight) {
+        // Cập nhật lại kích thước theo màn hình thực tế
         this.worldWidth = this.scene.scale.width;
         this.groundY = screenHeight - GAME_SETTINGS.GROUND_HEIGHT;
+
         this.scene.cameras.main.setBounds(0, 0, this.worldWidth, screenHeight);
 
         // 1. VẼ BẦU TRỜI
@@ -90,36 +76,41 @@ export default class EnvironmentManager {
             ).setOrigin(0, 0).setDepth(DEPTH.GROUND);
         } else {
             this.ground.width = this.worldWidth;
+            this.ground.y = this.groundY;
         }
 
-        // 3. VẼ MÂY & ĐÈN LỒNG (Đã bỏ vẽ cây)
-        if (!this._staticObjectsCreated) {
-            this.createDecorations(screenHeight);
-            this._staticObjectsCreated = true;
-        }
+        // 3. VẼ TRANG TRÍ (Mây, Đèn lồng) - Gọi hàm riêng để tái sử dụng khi resize
+        this.createDecorations(screenHeight);
     }
 
     createDecorations(screenHeight) {
-        // Vẽ Mây (Rải rác trong màn hình)
+        this.clouds.forEach(c => c.destroy());
+        this.clouds = [];
+
+        this.lanterns.forEach(l => l.destroy());
+        this.lanterns = [];
+
+        // Vẽ Mây
         const cloudCount = Math.ceil(this.worldWidth / 200);
         for (let i = 0; i < cloudCount; i++) {
             const x = Math.random() * this.worldWidth;
             const y = Math.random() * (screenHeight * 0.4);
-            this.scene.add.image(x, y, 'cloudPixel')
+            const cloud = this.scene.add.image(x, y, 'cloudPixel')
                 .setScale(2 + Math.random())
                 .setAlpha(0.9)
                 .setDepth(DEPTH.CLOUD);
-            // Bỏ setScrollFactor vì camera đứng yên
+            this.clouds.push(cloud);
         }
 
-        // Đèn lồng (Rải đều)
-        const lanternCount = Math.ceil(this.worldWidth / 400) - 0.69;
+        // Vẽ Đèn lồng (Dùng công thức của bạn)
+        const lanternCount = Math.ceil(this.worldWidth / 400) - 0.9;
         for (let i = 0; i < lanternCount; i++) {
             const x = (this.worldWidth / lanternCount) * i + 50;
-            this.scene.add.image(x, -10, 'lantern')
+            const lantern = this.scene.add.image(x, -10, 'lantern')
                 .setOrigin(0.5, 0)
                 .setScale(0.4)
                 .setDepth(DEPTH.LANTERN);
+            this.lanterns.push(lantern);
         }
     }
 
@@ -128,30 +119,30 @@ export default class EnvironmentManager {
         this.worldWidth = newWidth;
         this.groundY = newScreenHeight - GAME_SETTINGS.GROUND_HEIGHT;
 
-        // 1. Cập nhật bounds camera
+        // 1. Update Camera
         this.scene.cameras.main.setBounds(0, 0, newWidth, newScreenHeight);
 
-        // 2. Vẽ lại Bầu trời
+        // 2. Update Bầu trời
         if (this.sky) {
             this.sky.clear();
             this.sky.fillGradientStyle(0x6b8cff, 0x6b8cff, 0xafc1ff, 0xafc1ff, 1);
             this.sky.fillRect(0, 0, newWidth, newScreenHeight);
         }
 
-        // 3. Cập nhật Đất
+        // 3. Update Đất
         if (this.ground) {
             this.ground.y = this.groundY;
-            this.ground.width = newWidth; // Đất giãn ra theo màn hình
+            this.ground.width = newWidth;
         }
 
-        // Cập nhật vị trí Y ngựa
+        this.createDecorations(newScreenHeight);
+
         if (this.scene.players) {
             this.scene.players.updateHorseY(this.groundY - 130);
         }
     }
 
     launchFireworks() {
-        // ... (Giữ nguyên code pháo hoa cũ)
         const cam = this.scene.cameras.main;
         let count = 0;
         if (this.fireworkTimer) this.fireworkTimer.remove();
