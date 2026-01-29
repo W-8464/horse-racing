@@ -30,7 +30,11 @@ export default class PlayerManager {
     resetSharedHorse() {
         if (!this.sharedHorse) return;
         this.sharedHorse.x = GAME_SETTINGS.START_LINE_X || 100;
-        this.sharedHorse.y = GAME_SETTINGS.HORSE_Y;
+        if (this.scene.env) {
+            this.sharedHorse.y = this.scene.env.groundY - 130;
+        } else {
+            this.sharedHorse.y = GAME_SETTINGS.HORSE_Y;
+        }
         this.sharedHorse.anims.msPerFrame = 1000 / 10;
         this.sharedHorse.play('horse_idle');
     }
