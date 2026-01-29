@@ -16,7 +16,7 @@ app.get('/player', sendIndex);
 app.get('/host', sendIndex);
 
 // --- CẤU HÌNH ---
-const TARGET_TAPS = 1000;
+const TARGET_TAPS = 20;
 let currentTotalTaps = 0;
 let playerContributions = {}; // Lưu danh sách người chơi
 
@@ -122,12 +122,11 @@ io.on('connection', (socket) => {
         if (currentTotalTaps >= TARGET_TAPS) {
             gameState.status = 'FINISHED';
             const finishTime = ((Date.now() - startTime) / 1000).toFixed(2);
-            const leaderboard = Object.values(playerContributions)
-                .sort((a, b) => b.taps - a.taps)
-                .slice(0, 10);
+            const fullLeaderboard = Object.values(playerContributions)
+                .sort((a, b) => b.taps - a.taps);
 
             io.emit('raceFinished', {
-                topContributors: leaderboard,
+                allContributors: fullLeaderboard, // Gửi full list
                 totalPlayers: Object.keys(playerContributions).length,
                 totalTime: finishTime
             });

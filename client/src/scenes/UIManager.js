@@ -458,6 +458,10 @@ export default class UIManager {
         if (!this.state.isRaceStarted && !this.state.isFinished) {
             if (this.progressGraphics) {
                 this.progressGraphics.clear();
+                if (this.progressText) {
+                    this.progressText.destroy();
+                    this.progressText = null;
+                }
             }
             return;
         }
@@ -470,24 +474,20 @@ export default class UIManager {
 
         const { cx, h } = this._getLayout();
 
-        // SỬA: Đặt thanh progress xuống dưới đất
-        // h là đáy màn hình. Đất cao 64px. Tâm đất là h - 32.
         const yPos = h - 30;
-
-        // Tăng chiều rộng lên chút cho dễ nhìn
         const width = 400;
-        const height = 16; // Nhỏ lại xíu
-        const radius = 8;
+        const height = 24;
+        const radius = 12;
 
-        // Vẽ nền (Màu nâu đậm cho hợp với đất)
-        this.progressGraphics.fillStyle(0x3e2723, 1); // Dark brown
+        // Vẽ nền
+        this.progressGraphics.fillStyle(0x3e2723, 1);
         this.progressGraphics.fillRoundedRect(cx - width / 2, yPos - height / 2, width, height, radius);
 
         // Viền
-        this.progressGraphics.lineStyle(2, 0xffeb3b, 0.5); // Viền vàng nhạt
+        this.progressGraphics.lineStyle(2, 0xffeb3b, 0.5);
         this.progressGraphics.strokeRoundedRect(cx - width / 2, yPos - height / 2, width, height, radius);
 
-        // Vẽ phần Fill (Giữ màu cam/đỏ nổi bật)
+        // Vẽ phần Fill
         if (progress > 0) {
             const fillWidth = Math.max(radius * 2, width * progress);
             if (fillWidth > 0) {
@@ -495,6 +495,24 @@ export default class UIManager {
                 this.progressGraphics.fillRoundedRect(cx - width / 2, yPos - height / 2, fillWidth, height, radius);
             }
         }
+
+        // --- THÊM: HIỂN THỊ PHẦN TRĂM BÊN TRONG ---
+        if (!this.progressText) {
+            this.progressText = this.scene.add.text(cx, yPos, '', {
+                fontSize: '15px',       // Font vừa phải
+                fontFamily: 'monospace',
+                fontStyle: 'bold',
+                color: '#ffffff',       // Chữ trắng
+                stroke: '#000000',      // Viền đen để nổi trên nền cam/nâu
+                strokeThickness: 3
+            }).setOrigin(0.5, 0.5)      // Căn giữa tâm (Center-Center)
+                .setDepth(101)
+                .setScrollFactor(0);
+        }
+
+        const percentage = Math.floor(progress * 100);
+        this.progressText.setText(`${percentage}%`);
+        // ------------------------------------------
     }
 
     destroyWinner() {
@@ -502,16 +520,38 @@ export default class UIManager {
             this.finishRankText.destroy();
             this.finishRankText = null;
         }
+
+        if (this.finishStatsText) {
+            this.finishStatsText.destroy();
+            this.finishStatsText = null;
+        }
     }
 
-    // METHOD MỚI: Hiển thị chữ khi kết thúc
-    showFinishText() {
+    showFinishText(rank, taps) {
         const { cx, cy } = this._getLayout();
-        if (this.finishRankText) this.finishRankText.destroy();
+
+        this.destroyWinner();
+
         this.finishRankText = this.scene.add.text(
-            cx, cy - 100,
-            "HAPPY NEW YEAR",
+            cx, cy - 80,
+            "FINISHED!",
             { fontSize: '48px', fontFamily: 'monospace', color: '#5dfc9b', align: 'center', stroke: '#000', strokeThickness: 6 }
         ).setOrigin(0.5).setDepth(DEPTH.UI).setScrollFactor(0);
+
+        const rankStr = (rank === 1) ? "1st 🏆" : (rank === 2) ? "2nd 🥈" : (rank === 3) ? "3rd 🥉" : `#${rank}`;
+
+        this.finishStatsText = this.scene.add.text(
+            cx, cy,
+            `RANK: ${rankStr}\nTAPS: ${taps}`,
+            {
+                fontSize: '32px',
+                fontFamily: 'monospace',
+                color: '#ffeb3b',
+                align: 'center',
+                stroke: '#000',
+                strokeThickness: 4,
+                lineSpacing: 10
+            }
+        ).setOrigin(0.5, 0).setDepth(DEPTH.UI).setScrollFactor(0);
     }
 }

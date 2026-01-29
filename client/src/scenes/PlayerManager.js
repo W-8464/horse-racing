@@ -22,9 +22,7 @@ export default class PlayerManager {
         );
         this.sharedHorse.setDepth(DEPTH.HORSE);
         this.sharedHorse.play('horse_idle');
-
-        // Camera luôn đi theo con ngựa này
-        this.scene.cameras.main.startFollow(this.sharedHorse, true, 0.1, 0.1);
+        this.scene.cameras.main.setScroll(0, 0);
     }
 
     resetSharedHorse() {
@@ -42,13 +40,14 @@ export default class PlayerManager {
     updateSharedHorse(progress, speed) {
         if (!this.sharedHorse) return;
 
-        const startX = GAME_SETTINGS.START_LINE_X || 100;
-        const trackLength = (GAME_SETTINGS.FINISH_LINE_X || 5000) - startX;
+        const screenWidth = this.scene.scale.width;
+        const startX = 100;
+        const endX = screenWidth - 150;
+        const trackLength = endX - startX;
         const targetX = startX + (trackLength * progress);
 
         this.sharedHorse.x = Phaser.Math.Linear(this.sharedHorse.x, targetX, 0.1);
 
-        // Logic Animation
         if (this.state.isRaceStarted) {
             this.sharedHorse.play({ key: 'horse_run', repeat: -1 }, true);
             this.sharedHorse.anims.msPerFrame = 1000 / 12;

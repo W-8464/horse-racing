@@ -3,7 +3,7 @@ import { DEPTH, GAME_SETTINGS } from '../config/config.js';
 export default class EnvironmentManager {
     constructor(scene) {
         this.scene = scene;
-        this.worldWidth = GAME_SETTINGS.WORLD_WIDTH;
+        this.worldWidth = this.scene.scale.width;
 
         this.groundY = GAME_SETTINGS.GROUND_Y;
 
@@ -67,6 +67,7 @@ export default class EnvironmentManager {
     }
 
     setupWorld(screenHeight) {
+        this.worldWidth = this.scene.scale.width;
         this.groundY = screenHeight - GAME_SETTINGS.GROUND_HEIGHT;
         this.scene.cameras.main.setBounds(0, 0, this.worldWidth, screenHeight);
 
@@ -87,54 +88,64 @@ export default class EnvironmentManager {
                 GAME_SETTINGS.GROUND_HEIGHT,
                 'groundBlock'
             ).setOrigin(0, 0).setDepth(DEPTH.GROUND);
+        } else {
+            this.ground.width = this.worldWidth;
         }
 
         // 3. VẼ MÂY & ĐÈN LỒNG (Đã bỏ vẽ cây)
         if (!this._staticObjectsCreated) {
-
-            // Vẽ Mây
-            for (let i = 0; i < this.worldWidth; i += 200) {
-                const cloudY = Math.random() * (screenHeight * 0.4);
-                this.scene.add.image(i, cloudY, 'cloudPixel')
-                    .setScale(2 + Math.random())
-                    .setAlpha(0.9)
-                    .setDepth(DEPTH.CLOUD)
-                    .setScrollFactor(0.5);
-            }
-
-            // Đèn lồng
-            for (let x = 0; x < this.worldWidth; x += 400) {
-                this.scene.add.image(x, 0, 'lantern')
-                    .setOrigin(0.5, 0)
-                    .setScale(0.4)
-                    .setDepth(DEPTH.LANTERN) // Đảm bảo bạn đã khai báo DEPTH.LANTERN trong config hoặc dùng số cụ thể
-                    .setScrollFactor(0.8);
-            }
-
+            this.createDecorations(screenHeight);
             this._staticObjectsCreated = true;
         }
     }
 
+    createDecorations(screenHeight) {
+        // Vẽ Mây (Rải rác trong màn hình)
+        const cloudCount = Math.ceil(this.worldWidth / 200);
+        for (let i = 0; i < cloudCount; i++) {
+            const x = Math.random() * this.worldWidth;
+            const y = Math.random() * (screenHeight * 0.4);
+            this.scene.add.image(x, y, 'cloudPixel')
+                .setScale(2 + Math.random())
+                .setAlpha(0.9)
+                .setDepth(DEPTH.CLOUD);
+            // Bỏ setScrollFactor vì camera đứng yên
+        }
+
+        // Đèn lồng (Rải đều)
+        const lanternCount = Math.ceil(this.worldWidth / 400) - 0.69;
+        for (let i = 0; i < lanternCount; i++) {
+            const x = (this.worldWidth / lanternCount) * i + 50;
+            this.scene.add.image(x, -10, 'lantern')
+                .setOrigin(0.5, 0)
+                .setScale(0.4)
+                .setDepth(DEPTH.LANTERN);
+        }
+    }
+
     resize(newScreenHeight) {
+        const newWidth = this.scene.scale.width;
+        this.worldWidth = newWidth;
         this.groundY = newScreenHeight - GAME_SETTINGS.GROUND_HEIGHT;
 
-        this.scene.cameras.main.setBounds(0, 0, this.worldWidth, newScreenHeight);
+        // 1. Cập nhật bounds camera
+        this.scene.cameras.main.setBounds(0, 0, newWidth, newScreenHeight);
 
+        // 2. Vẽ lại Bầu trời
         if (this.sky) {
             this.sky.clear();
             this.sky.fillGradientStyle(0x6b8cff, 0x6b8cff, 0xafc1ff, 0xafc1ff, 1);
-            this.sky.fillRect(0, 0, this.worldWidth, newScreenHeight);
+            this.sky.fillRect(0, 0, newWidth, newScreenHeight);
         }
 
+        // 3. Cập nhật Đất
         if (this.ground) {
             this.ground.y = this.groundY;
+            this.ground.width = newWidth; // Đất giãn ra theo màn hình
         }
 
-        // Đã bỏ cập nhật vị trí cây
-
-        // Cập nhật vị trí ngựa theo Ground Y mới
+        // Cập nhật vị trí Y ngựa
         if (this.scene.players) {
-            // Sử dụng logic trừ offset tương tự như trong config
             this.scene.players.updateHorseY(this.groundY - 130);
         }
     }

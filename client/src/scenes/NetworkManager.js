@@ -162,8 +162,19 @@ export default class NetworkManager {
             if (this.state.role === 'host') {
                 this.ui.updateHostLeaderboard(data.topContributors || [], data.totalPlayers || 0);
             }
-            else if (this.state.role === 'player' || this.state.role === 'spectator') {
-                this.ui.showFinishText();
+            else if (this.state.role === 'player') {
+                const myId = this.socket.id;
+                const myListIndex = data.allContributors.findIndex(p => p.id === myId);
+
+                let myRank = '?';
+                let myTaps = 0;
+
+                if (myListIndex !== -1) {
+                    myRank = myListIndex + 1;
+                    myTaps = data.allContributors[myListIndex].taps;
+                }
+
+                this.ui.showFinishText(myRank, myTaps);
             }
         });
 

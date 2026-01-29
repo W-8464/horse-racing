@@ -22,8 +22,8 @@ export const GAME_SETTINGS = {
     DESIGN_HEIGHT: 430,
 
     START_LINE_X: 100,
-    FINISH_LINE_X: 5400,
-    WORLD_WIDTH: 5500,
+    get FINISH_LINE_X() { return this.DESIGN_WIDTH - 100; },
+    get WORLD_WIDTH() { return this.DESIGN_WIDTH; },
 
     COUNTDOWN_TIME: 3,
     TICK_RATE: 20,
