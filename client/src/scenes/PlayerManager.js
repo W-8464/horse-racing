@@ -16,10 +16,14 @@ export default class PlayerManager {
             GAME_SETTINGS.HORSE_Y,
             'horse',
             'shared',
-            0xffffff,
+            0xFFD700,
             '',
             false
         );
+        if (this.sharedHorse.preFX) {
+            const fx = this.sharedHorse.preFX.addColorMatrix();
+            fx.brightness(1.2);
+        }
         this.sharedHorse.setDepth(DEPTH.HORSE);
         this.sharedHorse.play('horse_idle');
         this.scene.cameras.main.setScroll(0, 0);
@@ -29,7 +33,7 @@ export default class PlayerManager {
         if (!this.sharedHorse) return;
         this.sharedHorse.x = GAME_SETTINGS.START_LINE_X || 100;
         if (this.scene.env) {
-            this.sharedHorse.y = this.scene.env.groundY - 130;
+            this.sharedHorse.y = this.scene.env.groundY - 81;
         } else {
             this.sharedHorse.y = GAME_SETTINGS.HORSE_Y;
         }

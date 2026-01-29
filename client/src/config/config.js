@@ -32,7 +32,9 @@ export const GAME_SETTINGS = {
     GROUND_HEIGHT: 64,
 
     get GROUND_Y() { return this.DESIGN_HEIGHT - this.GROUND_HEIGHT; },
-    get HORSE_Y() { return this.GROUND_Y - 130; }
+    // Công thức: GroundY - (Chiều cao gốc * Scale / 2)
+    // 270 * 0.6 / 2 = 81
+    get HORSE_Y() { return this.GROUND_Y - 81; }
 };
 
 export const DEPTH = {

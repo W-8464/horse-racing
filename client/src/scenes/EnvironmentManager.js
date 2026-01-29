@@ -103,12 +103,12 @@ export default class EnvironmentManager {
         }
 
         // Vẽ Đèn lồng (Dùng công thức của bạn)
-        const lanternCount = Math.ceil(this.worldWidth / 400) - 0.9;
+        const lanternCount = Math.ceil(this.worldWidth / 300) - 0.9;
         for (let i = 0; i < lanternCount; i++) {
             const x = (this.worldWidth / lanternCount) * i + 50;
             const lantern = this.scene.add.image(x, -10, 'lantern')
                 .setOrigin(0.5, 0)
-                .setScale(0.4)
+                .setScale(0.3)
                 .setDepth(DEPTH.LANTERN);
             this.lanterns.push(lantern);
         }
@@ -138,7 +138,7 @@ export default class EnvironmentManager {
         this.createDecorations(newScreenHeight);
 
         if (this.scene.players) {
-            this.scene.players.updateHorseY(this.groundY - 130);
+            this.scene.players.updateHorseY(this.groundY - 81);
         }
     }
 

@@ -125,7 +125,7 @@ export default class GameScene extends Phaser.Scene {
             this.handleFullScreen();
 
             // Kích hoạt chế độ màn hình đen cho Host
-            this.setupHostView();
+            //this.setupHostView();
 
             this.ui.showHostPasswordInput(
                 (password) => {
@@ -150,7 +150,7 @@ export default class GameScene extends Phaser.Scene {
         // if (window.innerHeight > window.innerWidth) return;
 
         // HOST: Không update visual ngựa
-        if (this.state.role === 'host') return;
+        //if (this.state.role === 'host') return;
 
         // PLAYER và SPECTATOR: Đều update visual ngựa
         // Nếu role là spectator, this.players vẫn tồn tại (được init ở create)

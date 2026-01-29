@@ -30,6 +30,7 @@ export default class NetworkManager {
     bindListeners() {
         this.socket.on('initialState', (status) => {
             if (this.state.role !== 'host' && status !== 'LOBBY') {
+                console.log('Game đang chạy, chuyển sang chế độ khán giả');
                 this.state.role = 'spectator';
                 if (status === 'RUNNING') {
                     this.state.isRaceStarted = true;
@@ -44,50 +45,61 @@ export default class NetworkManager {
             this.ui.showSpectatorMode();
         });
 
-        // 1. CHỈ GIỮ LẠI gameUpdateFast (Xóa gameStateUpdate cũ)
         this.socket.on('gameUpdateFast', (data) => {
             this.state.progress = data.p;
+
+            // SỬA: Cập nhật trạng thái chạy cho TẤT CẢ (bao gồm Host)
+            if (data.s === 'RUNNING') {
+                this.state.isRaceStarted = true;
+            }
+
             this.ui.updateProgressBar(data.p, 0);
 
+            // Host đã được phép update visual trong GameScene.update, 
+            // nhưng để chắc chắn mượt mà, ta có thể gọi updateSharedHorse ở đây cho Player/Spectator
             if (this.state.role !== 'host' && this.players) {
-                if (data.s === 'RUNNING') this.state.isRaceStarted = true;
+                this.players.updateSharedHorse(data.p, 0);
             }
         });
 
+        // SỬA: Cả Host và Player đều nhận Leaderboard HUD
         this.socket.on('leaderboardUpdate', (data) => {
-            if (this.state.role === 'host') {
-                this.ui.updateHostLeaderboard(data.top, data.total);
-            }
+            this.ui.updateLeaderboardHUD(data.top, data.total, this.state.role === 'host');
         });
 
         this.socket.on('raceReset', (data) => {
+            // 1. Reset State
             this.state.progress = 0;
             this.state.speed = 0;
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
+            this.state.finishedPlayers = [];
 
+            // 2. Reset UI
             this.ui.destroyWinner();
             this.ui.destroyStartButton();
             this.ui.destroyWaitingText();
             this.ui.updateProgressBar(0, 0);
-            this.ui.destroySpectatorText();
 
+            // SỬA: Reset HUD về trạng thái ban đầu (dùng slice 5 cho gọn)
+            this.ui.updateLeaderboardHUD(data.players.slice(0, 10), data.totalPlayers, this.state.role === 'host');
+
+            // Reset Ngựa
             this.players.resetSharedHorse();
 
-            if (this.scene.env) {
-                this.scene.env.stopFireworks();
-            }
+            // Reset Âm thanh & Pháo hoa
+            if (this.scene.env) this.scene.env.stopFireworks();
 
-            // Reset âm thanh
             if (!this.scene.state.sounds.bgm.isPlaying) {
                 this.scene.state.sounds.bgm.play();
             }
             this.scene.state.sounds.gallop.stop();
             this.scene.state.sounds.audience.stop();
-            this.scene.state.sounds.finish.stop(); // Stop nhạc finish nếu đang chạy
+            this.scene.state.sounds.finish.stop();
 
+            // 3. UI RIÊNG
             if (this.state.role === 'host') {
-                this.ui.updateHostLeaderboard(data.players, data.totalPlayers);
+                // Host chỉ hiện nút Start (Leaderboard đã có ở góc phải)
                 this.ui.showStartButton(() => this.hostStartGame());
             }
 
@@ -113,7 +125,9 @@ export default class NetworkManager {
         this.socket.on('hostAccepted', () => {
             if (this.state.role !== 'host') return;
             this.ui.destroyHostPasswordInput();
-            this.ui.showHostLeaderboard();
+
+            // SỬA: Khởi tạo HUD rỗng và hiện nút Start
+            this.ui.updateLeaderboardHUD([], 0, true);
             this.ui.showStartButton(() => this.hostStartGame());
         });
 
@@ -132,6 +146,7 @@ export default class NetworkManager {
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
 
+            // Host không cần countdown text to, chỉ Player cần
             if (this.state.role === 'player') {
                 this.ui.startCountdown();
             }
@@ -143,13 +158,12 @@ export default class NetworkManager {
             });
         });
 
-        // 2. CẬP NHẬT XỬ LÝ KẾT THÚC
+        // 4. XỬ LÝ KẾT THÚC GAME
         this.socket.on('raceFinished', (data) => {
             this.state.isFinished = true;
             this.state.isRaceStarted = false;
             this.players.updateSharedHorse(1, 0);
 
-            // Dừng các âm thanh nền
             this.scene.state.sounds.audience.stop();
             this.scene.state.sounds.gallop.stop();
             this.scene.state.sounds.bgm.stop();
@@ -159,22 +173,27 @@ export default class NetworkManager {
                 this.scene.env.launchFireworks();
             }
 
+            // Cập nhật HUD lần cuối cho tất cả mọi người
+            const all = data.allContributors || [];
+            this.ui.updateLeaderboardHUD(all.slice(0, 10), data.totalPlayers || 0, this.state.role === 'host');
+
+            // Hiển thị thông báo kết thúc
             if (this.state.role === 'host') {
-                this.ui.updateHostLeaderboard(data.topContributors || [], data.totalPlayers || 0);
+                // Host: Happy New Year
+                this.ui.showFinishText(null, null, true);
             }
             else if (this.state.role === 'player') {
+                // Player: Rank & Taps
                 const myId = this.socket.id;
-                const myListIndex = data.allContributors.findIndex(p => p.id === myId);
+                const myListIndex = all.findIndex(p => p.id === myId);
 
                 let myRank = '?';
                 let myTaps = 0;
-
                 if (myListIndex !== -1) {
                     myRank = myListIndex + 1;
-                    myTaps = data.allContributors[myListIndex].taps;
+                    myTaps = all[myListIndex].taps;
                 }
-
-                this.ui.showFinishText(myRank, myTaps);
+                this.ui.showFinishText(myRank, myTaps, false);
             }
         });
 
@@ -191,6 +210,7 @@ export default class NetworkManager {
     }
 
     selectRoleHost(password) {
+        this.ui.cachedHostPassword = password; // Lưu pass để reconnect nếu cần
         this.socket.emit('selectRole', { role: 'host', password });
     }
 
