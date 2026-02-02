@@ -25,7 +25,7 @@ export default class InputManager {
         // click vào flash button thì bỏ qua click chạy
         if (this.flashSkill.isPointerOnButton(pointer)) return;
 
-        this.players.moveSelfBy(20);
+        this.players.moveSelfBy(10);
         this.network.emitMovement(this.players.horse.x);
 
         if (this.players.horse.requestRun) this.players.horse.requestRun(1);

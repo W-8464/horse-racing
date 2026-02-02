@@ -448,13 +448,12 @@ export default class UIManager {
 
         const { w, h, cx, cy } = this._getLayout();
 
-        // [SỬA ĐỔI 1]: Logic Scale "mạnh tay" hơn cho màn hình thấp
         let contentScale = 1;
         if (h < 800) contentScale = 0.75;
-        if (h < 500) contentScale = 0.6; // Màn hình iPhone xoay ngang (cao ~400px) cần scale này
+        if (h < 500) contentScale = 0.6;
 
         this.podiumContainer = this.scene.add.container(cx, cy)
-            .setDepth(DEPTH.UI + 20)
+            .setDepth(2000)
             .setScrollFactor(0)
             .setScale(contentScale);
 
@@ -463,8 +462,6 @@ export default class UIManager {
         overlay.setInteractive();
         this.podiumContainer.add(overlay);
 
-        // [SỬA ĐỔI 2]: Tiêu đề VICTORY
-        // Mặc định -220, nếu màn hình thấp thì kéo xuống -180 cho đỡ bị khuất lên trên
         let titleY = -220;
         if (h < 500) titleY = -210;
 
@@ -472,7 +469,6 @@ export default class UIManager {
             fontFamily: 'monospace', fontSize: '60px', color: '#ffeb3b', fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // Thu nhỏ chữ chút nữa nếu màn hình quá bé
         if (h < 500) titleText.setScale(0.8);
 
         this.podiumContainer.add(titleText);
@@ -528,17 +524,14 @@ export default class UIManager {
             this.podiumContainer.add(timeTxt);
         });
 
-        // [SỬA ĐỔI 3]: Nút Play Again
-        // Kéo lên toạ độ 240 (gần sát chân bục Rank 1) để đảm bảo không bị lọt khỏi màn hình
         if (this.state.role === 'host') {
-            const btnContainer = this.createPhaserButton(0, 240, "PLAY AGAIN", () => {
+            const btnContainer = this.createPhaserButton(0, 270, "PLAY AGAIN", () => {
                 this.scene.events.emit('restartRequested');
             });
             this.podiumContainer.add(btnContainer);
         }
     }
 
-    // Helper tạo nút bấm bằng Phaser Graphic (thay thế DOM button)
     createPhaserButton(x, y, text, callback) {
         const container = this.scene.add.container(x, y);
 
@@ -553,13 +546,17 @@ export default class UIManager {
         }).setOrigin(0.5);
 
         container.add([bg, txt]);
+        container.setInteractive(new Phaser.Geom.Rectangle(-80, -25, 160, 50), Phaser.Geom.Rectangle.Contains);
 
-        // Tương tác
-        bg.setInteractive(new Phaser.Geom.Rectangle(-80, -25, 160, 50), Phaser.Geom.Rectangle.Contains);
-        bg.on('pointerdown', () => {
+        container.on('pointerdown', () => {
             container.setScale(0.95);
         });
-        bg.on('pointerup', () => {
+
+        container.on('pointerout', () => {
+            container.setScale(1);
+        });
+
+        container.on('pointerup', () => {
             container.setScale(1);
             callback();
         });
