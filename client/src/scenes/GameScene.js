@@ -69,11 +69,10 @@ export default class GameScene extends Phaser.Scene {
             frameHeight: 270
         });
 
-        this.load.image('lantern', 'assets/images/light.png');
         this.load.image('flash_icon', 'assets/images/flash.png');
 
         // Nhạc nền (BGM)
-        this.load.audio('bgm', 'assets/sounds/background_music.mp3');
+        //this.load.audio('bgm', 'assets/sounds/background_music.mp3');
         // Hiệu ứng âm thanh (SFX)
         this.load.audio('countdown_full', 'assets/sounds/countdown.mp3');
         this.load.audio('gallop', 'assets/sounds/gallop.mp3');
@@ -93,13 +92,13 @@ export default class GameScene extends Phaser.Scene {
         this.env.drawCheckeredLine(GAME_SETTINGS.FINISH_LINE_X);
 
         // sounds
-        this.state.sounds.bgm = this.sound.add('bgm', { loop: true, volume: 0.5 });
+        //this.state.sounds.bgm = this.sound.add('bgm', { loop: true, volume: 0.5 });
         this.state.sounds.countdown = this.sound.add('countdown_full');
         this.state.sounds.gallop = this.sound.add('gallop', { loop: true });
         this.state.sounds.audience = this.sound.add('audience', { loop: true });
         this.state.sounds.finish = this.sound.add('finish_sound');
 
-        this.state.sounds.bgm.play();
+        this.state.sounds.audience.play();
 
         // anims
         this.createAnimations();

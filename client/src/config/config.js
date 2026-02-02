@@ -41,7 +41,6 @@ export const DEPTH = {
     GRASS: 2,
     CHECK_LINE: 3,
     HORSE: 5,
-    TREE: 10,
     LANTERN: 15,
     UI: 100
 };

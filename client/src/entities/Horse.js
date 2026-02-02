@@ -21,7 +21,7 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
         this.setTint(this.baseColor);
         this.setDepth(DEPTH.HORSE);
 
-        const nameColor = isLocal ? '#ff0000' : '#ffffff';
+        const nameColor = isLocal ? '#fff000' : '#ffffff';
         const displayName = isLocal ? `⭐ ${name}` : name;
         this.nameText = scene.add.text(
             x,

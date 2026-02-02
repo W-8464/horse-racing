@@ -77,11 +77,11 @@ export default class NetworkManager {
         });
 
         this.socket.on('raceReset', (players) => {
-            if (!this.scene.state.sounds.bgm.isPlaying) {
-                this.scene.state.sounds.bgm.play();
-            }
+            // if (!this.scene.state.sounds.bgm.isPlaying) {
+            //     this.scene.state.sounds.bgm.play();
+            // }
             this.scene.state.sounds.gallop.stop();
-            this.scene.state.sounds.audience.stop();
+            //this.scene.state.sounds.audience.stop();
 
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
@@ -127,9 +127,9 @@ export default class NetworkManager {
         });
 
         this.socket.on('startCountdown', () => {
-            if (this.scene.state.sounds.bgm.isPlaying) this.scene.state.sounds.bgm.stop();
+            //if (this.scene.state.sounds.bgm.isPlaying) this.scene.state.sounds.bgm.stop();
             this.scene.state.sounds.countdown.play();
-            this.scene.state.sounds.audience.play();
+            //this.scene.state.sounds.audience.play();
 
             this.ui.clearBeforeCountdown();
             this.state.isRaceStarted = false;
@@ -155,23 +155,19 @@ export default class NetworkManager {
             this.state.isRaceStarted = false;
             this.state.isFinished = true;
 
-            this.scene.state.sounds.audience.stop();
+            //this.scene.state.sounds.audience.stop();
             this.scene.state.sounds.gallop.stop();
-            if (!this.scene.state.sounds.bgm.isPlaying) {
-                this.scene.state.sounds.bgm.play();
-            }
+            // if (!this.scene.state.sounds.bgm.isPlaying) {
+            //     this.scene.state.sounds.bgm.play();
+            // }
 
             if (this.state.role === 'host') {
                 this.ui.updateHostLeaderboard(data.top10, data.top10);
             }
 
-            // data.top10 chứa danh sách top 10
             const top3 = data.top10.slice(0, 3);
 
-            // Gọi UI hiển thị
-            // Lưu ý truyền vào callback restart
             this.ui.showPodium(top3, () => {
-                // Hành động khi host bấm nút Restart trên bục
                 socket.emit('hostRestartGame');
             });
         });

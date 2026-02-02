@@ -167,13 +167,12 @@ export default class UIManager {
         return !!this.podiumContainer;
     }
 
-    // ... (Các hàm showPlayerNameInput, showHostPasswordInput giữ nguyên) ...
-
     showPlayerNameInput(onJoin) {
         const { cx, cy } = this._getLayout();
+        const textStyle = "color:#5dfc9b;font-family:monospace;font-size:32px;margin-bottom:10px; font-weight:bold; text-shadow: 2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000, 1px 1px #000, -1px -1px #000, 1px -1px #000, -1px 1px #000;";
         const dom = this.scene.add.dom(cx, cy).createFromHTML(`
       <div style="text-align:center">
-        <div style="color:#5dfc9b;font-family:monospace;font-size:32px;margin-bottom:10px">ENTER NAME</div>
+        <div style="${textStyle}">ENTER NAME</div>
         <input id="playerName" type="text" style="${PIXEL_INPUT_STYLE}" />
         <br/><br/>
         <div style="display: flex; gap: 10px; justify-content: center;">
@@ -204,9 +203,10 @@ export default class UIManager {
 
     showHostPasswordInput(onConfirm) {
         const { cx } = this._getLayout();
+        const textStyle = "color:#ff1744;font-family:monospace;font-size:20px;margin-bottom:10px; font-weight:bold; text-shadow: 2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000, 1px 1px #000, -1px -1px #000, 1px -1px #000, -1px 1px #000;";
         const dom = this.scene.add.dom(cx, 300).createFromHTML(`
       <div style="text-align:center">
-        <div style="color:#ff1744;font-family:monospace;font-size:20px;margin-bottom:10px">HOST ACCESS</div>
+        <div style="${textStyle}">HOST ACCESS</div>
         <input id="hostPass" type="password" style="${PIXEL_INPUT_STYLE}" />
         <br/><br/>
         <button id="hostBtn" style="${PIXEL_BTN_STYLE}">CONFIRM</button>
@@ -241,7 +241,13 @@ export default class UIManager {
     showWaitingText() {
         if (this.waitingText) return;
         const { cx } = this._getLayout();
-        this.waitingText = this.scene.add.text(cx, 300, 'Waiting to start...', { fontSize: '28px', fontFamily: 'monospace', color: '#ffffff' })
+        this.waitingText = this.scene.add.text(cx, 300, 'Waiting to start...', {
+            fontSize: '28px',
+            fontFamily: 'monospace',
+            color: '#ffffff',
+            stroke: '#000000',    // Màu viền đen
+            strokeThickness: 6    // Độ dày viền
+        })
             .setOrigin(0.5).setDepth(DEPTH.UI);
         this.layout();
     }
@@ -388,13 +394,22 @@ export default class UIManager {
         this.finishRankText = this.scene.add.text(
             cx, cy - 100,
             `YOU FINISHED!\nRANK: ${rank}`,
-            { fontSize: '32px', fontFamily: 'monospace', color: '#003b1f', align: 'center' }
+            {
+                fontSize: '32px',
+                fontFamily: 'monospace',
+                color: '#5dfc9b',    // Màu xanh sáng (giống khung nhập tên)
+                align: 'center',
+                fontStyle: 'bold',
+                stroke: '#000000',   // Viền đen
+                strokeThickness: 6   // Độ dày viền
+            }
         ).setOrigin(0.5).setDepth(DEPTH.UI).setScrollFactor(0);
         this.layout();
     }
 
     showPodium(top3Data) {
         this.clearAllDomElements();
+        this.destroyWinner();
         if (this.hostLeaderboardDom) {
             this.hostLeaderboardDom.destroy();
             this.hostLeaderboardDom = null;
@@ -404,7 +419,7 @@ export default class UIManager {
         const { w, h, cx, cy } = this._getLayout();
 
         this.podiumContainer = this.scene.add.container(cx, cy)
-            .setDepth(2000)
+            .setDepth(30000)
             .setScrollFactor(0);
 
         const overlay = this.scene.add.rectangle(0, 0, w * 3, h * 3, 0x000000, 0.85);
@@ -473,6 +488,7 @@ export default class UIManager {
             fontSize: '20px', fontFamily: 'monospace', fontStyle: 'bold'
         }).setOrigin(0.5);
         container.add([bg, txt]);
+        container.setScrollFactor(0);
         container.setInteractive(new Phaser.Geom.Rectangle(-80, -25, 160, 50), Phaser.Geom.Rectangle.Contains);
         container.on('pointerdown', () => { container.setScale(0.95); });
         container.on('pointerout', () => { container.setScale(1); });
@@ -524,7 +540,7 @@ export default class UIManager {
 
         // [SỬA ĐỔI] Tạo container mà không set scale ở đây
         this.guideContainer = this.scene.add.container(cx, cy)
-            .setDepth(DEPTH.UI + 100)
+            .setDepth(30000)
             .setScrollFactor(0);
 
         const overlay = this.scene.add.rectangle(0, 0, w * 2, h * 2, 0x000000, 0.85);
