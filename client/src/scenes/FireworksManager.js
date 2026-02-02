@@ -62,7 +62,7 @@ export default class FireworksManager {
 
         emitter.setScrollFactor(0);
 
-        emitter.setDepth(2001);
+        emitter.setDepth(30001);
 
         emitter.explode(40);
 

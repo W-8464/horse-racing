@@ -41,13 +41,8 @@ export default class PlayerManager {
         if (this.horse) {
             this.horse.y = visualY;
             this.horse.serverIndex = playerInfo.serverIndex;
-            // Cập nhật lại baseServerY nếu có thay đổi
             this.horse.baseServerY = playerInfo.y;
-            this.horse.setDepth(visualY);
-
-            if (this.horse.nameText) {
-                this.horse.nameText.setDepth(visualY + 10000);
-            }
+            this._updateHorseDepth(this.horse); // [UPDATE] Dùng hàm chuẩn
             return;
         }
 
@@ -62,10 +57,8 @@ export default class PlayerManager {
             true
         );
 
-        // [FIX] Lưu vị trí gốc của server vào instance ngựa
         this.horse.baseServerY = playerInfo.y;
-
-        this.horse.setDepth(DEPTH.HORSE);
+        this._updateHorseDepth(this.horse); // [UPDATE] Dùng hàm chuẩn
 
         if (this.horse.playIdle) this.horse.playIdle();
         else this.horse.play('horse_idle');
@@ -82,12 +75,11 @@ export default class PlayerManager {
         const existing = this.otherPlayers.getChildren().find(p => p.playerId === playerInfo.id);
         if (existing) {
             existing.serverIndex = playerInfo.serverIndex;
-            // [FIX] Cập nhật baseServerY
             existing.baseServerY = playerInfo.y;
 
             if (Math.abs(existing.y - visualY) > 1) {
                 existing.y = visualY;
-                existing.setDepth(visualY);
+                this._updateHorseDepth(existing); // [UPDATE]
             }
             return;
         }
@@ -103,15 +95,43 @@ export default class PlayerManager {
             false
         );
 
-        // [FIX] Lưu vị trí gốc của server
         other.baseServerY = playerInfo.y;
         other.serverIndex = playerInfo.serverIndex;
-        other.setDepth(visualY);
+        this._updateHorseDepth(other); // [UPDATE]
 
         if (other.playIdle) other.playIdle();
         else other.play('horse_idle');
 
         this.otherPlayers.add(other);
+    }
+
+    // [NEW] Hàm helper để set depth cho 1 con ngựa cụ thể
+    _updateHorseDepth(horseObj) {
+        if (!horseObj || !horseObj.active) return;
+
+        // Depth của ngựa bằng đúng toạ độ Y để chúng che nhau đúng quy luật xa gần
+        horseObj.setDepth(horseObj.y);
+
+        // Depth của tên: Cao hơn ngựa một chút, nhưng PHẢI thấp hơn UI
+        if (horseObj.nameText) {
+            // Dùng DEPTH.NAME_OFFSET (ví dụ 1000) thay vì 10000
+            const nameDepth = horseObj.y + (DEPTH.NAME_OFFSET || 1000);
+            horseObj.nameText.setDepth(nameDepth);
+        }
+    }
+
+    // [NEW] Hàm này sẽ được gọi trong update() của Scene
+    updateDepths() {
+        // 1. Ngựa mình
+        if (this.horse) {
+            this._updateHorseDepth(this.horse);
+        }
+        // 2. Ngựa khác
+        if (this.otherPlayers) {
+            this.otherPlayers.children.iterate((child) => {
+                this._updateHorseDepth(child);
+            });
+        }
     }
 
     updateAllPositions(networkManager) {
@@ -126,8 +146,6 @@ export default class PlayerManager {
 
         this.otherPlayers.getChildren().forEach(horse => {
             const idx = horse.serverIndex;
-            // Lưu ý: Server chỉ gửi X cập nhật liên tục, còn Y thường cố định.
-            // Tuy nhiên, nếu server gửi cả Y (trong snapshot), ta vẫn phải convert qua VisualY
             const x0 = b0.p[idx];
             const x1 = b1.p[idx];
 
@@ -139,14 +157,6 @@ export default class PlayerManager {
                     else if (horse.playRun) horse.playRun();
                 }
             }
-
-            // Đảm bảo Y luôn đúng (đề phòng resize trình duyệt giữa chừng)
-            // Lấy lại Y gốc từ server data (hoặc giữ nguyên Y hiện tại nếu server không gửi Y trong tick)
-            // Ở đây ta giả định Y không đổi trong race, nhưng cần update VisualOffset nếu Host resize
-            // Cách đơn giản nhất: Lấy Y hiện tại trừ offset cũ cộng offset mới...
-            // NHƯNG: Để đơn giản, ta chỉ cần set lại Y đúng trong addSelf/addOther hoặc khi resize.
-            // Nếu bạn muốn realtime resize:
-            // horse.y = this.getVisualY(ORIGINAL_SERVER_Y); -> Cần lưu serverY gốc vào object horse
         });
 
         if (this.state.role === 'host' && this.horse) {
@@ -160,19 +170,17 @@ export default class PlayerManager {
     }
 
     refreshHorseYPositions() {
-        // 1. Cập nhật ngựa của mình
         if (this.horse && this.horse.baseServerY !== undefined) {
             const newY = this.getVisualY(this.horse.baseServerY);
             this.horse.y = newY;
-            this.horse.setDepth(newY);
+            this._updateHorseDepth(this.horse); // [UPDATE]
         }
 
-        // 2. Cập nhật ngựa người khác
         this.otherPlayers.getChildren().forEach(horse => {
             if (horse.baseServerY !== undefined) {
                 const newY = this.getVisualY(horse.baseServerY);
                 horse.y = newY;
-                horse.setDepth(newY);
+                this._updateHorseDepth(horse); // [UPDATE]
             }
         });
     }
@@ -187,7 +195,7 @@ export default class PlayerManager {
             this.horse.x = players[myId].x;
             const visualY = this.getVisualY(players[myId].y);
             this.horse.y = visualY;
-            this.horse.setDepth(visualY);
+            this._updateHorseDepth(this.horse); // [UPDATE]
 
             if (this.horse.resetColor) this.horse.resetColor();
         }
@@ -197,7 +205,7 @@ export default class PlayerManager {
             if (info) {
                 const visualY = this.getVisualY(info.y);
                 p.setPosition(info.x, visualY);
-                p.setDepth(visualY);
+                this._updateHorseDepth(p); // [UPDATE]
             }
         });
     }

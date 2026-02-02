@@ -12,7 +12,6 @@ export default class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
 
-        // state chung (thay cho việc GameScene ôm cả đống field)
         this.state = {
             role: null,
             isFinished: false,
@@ -71,9 +70,6 @@ export default class GameScene extends Phaser.Scene {
 
         this.load.image('flash_icon', 'assets/images/flash.png');
 
-        // Nhạc nền (BGM)
-        //this.load.audio('bgm', 'assets/sounds/background_music.mp3');
-        // Hiệu ứng âm thanh (SFX)
         this.load.audio('countdown_full', 'assets/sounds/countdown.mp3');
         this.load.audio('gallop', 'assets/sounds/gallop.mp3');
         this.load.audio('audience', 'assets/sounds/audience.mp3');
@@ -85,14 +81,13 @@ export default class GameScene extends Phaser.Scene {
         this.env = new EnvironmentManager(this);
         this.env.createPixelTextures();
 
-        const initialWorldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT || 720, this.scale.height);
+        const initialWorldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT, this.scale.height);
         this.env.setupWorld(initialWorldHeight);
 
         this.env.drawCheckeredLine(GAME_SETTINGS.START_LINE_X);
         this.env.drawCheckeredLine(GAME_SETTINGS.FINISH_LINE_X);
 
         // sounds
-        //this.state.sounds.bgm = this.sound.add('bgm', { loop: true, volume: 0.5 });
         this.state.sounds.countdown = this.sound.add('countdown_full');
         this.state.sounds.gallop = this.sound.add('gallop', { loop: true });
         this.state.sounds.audience = this.sound.add('audience', { loop: true });
@@ -103,6 +98,7 @@ export default class GameScene extends Phaser.Scene {
         // anims
         this.createAnimations();
 
+        // [NOTE] FireworksManager cần đảm bảo setDepth(DEPTH.FIREWORK) bên trong nó
         this.fireworks = new FireworksManager(this);
 
         // managers
@@ -120,29 +116,21 @@ export default class GameScene extends Phaser.Scene {
         this.inputs.init();
 
         this.setupResizeHandler();
-
         this.setupRestartHandler();
 
         this.showInitialUI();
     }
 
     setupResizeHandler() {
-        // layout ngay lúc init
         this.handleResize({ width: this.scale.width, height: this.scale.height });
-
         this.scale.on('resize', this.handleResize, this);
-
-        // cleanup
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.scale.off('resize', this.handleResize, this);
         });
     }
 
     setupRestartHandler() {
-        // chỉ host mới được yêu cầu restart
         this.events.on('restartRequested', this.handleRestartRequested, this);
-
-        // cleanup
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.events.off('restartRequested', this.handleRestartRequested, this);
         });
@@ -150,38 +138,25 @@ export default class GameScene extends Phaser.Scene {
 
     handleRestartRequested() {
         if (this.state.role !== 'host') return;
-
-        // Ưu tiên gọi method nếu NetworkManager có expose
         if (this.network?.requestRestart) {
             this.network.requestRestart();
             return;
         }
-
-        // fallback: nếu NetworkManager expose socket
         if (this.network?.socket) {
             this.network.socket.emit('hostRestartGame');
             return;
         }
-
         console.warn('[restart] Cannot find socket/requestRestart in NetworkManager');
     }
 
     handleResize(gameSize) {
         const width = gameSize.width;
         const height = gameSize.height;
-
         const cam = this.cameras.main;
 
-        const baseW = GAME_SETTINGS.DESIGN_WIDTH || 1560;
-        const baseH = GAME_SETTINGS.DESIGN_HEIGHT || 720;
-        const rawZoom = Math.min(width / baseW, height / baseH);
-        const zoom = Phaser.Math.Clamp(rawZoom, 0.45, 1);
-
+        const worldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT, height);
         cam.setViewport(0, 0, width, height);
         cam.setSize(width, height);
-        //cam.setZoom(zoom);
-        //const worldHeight = Math.max(baseH, height / zoom);
-        const worldHeight = Math.max(GAME_SETTINGS.DESIGN_HEIGHT || 720, height);
         cam.setBounds(0, 0, GAME_SETTINGS.WORLD_WIDTH, worldHeight);
 
         this.env?.resize(worldHeight);
@@ -227,6 +202,7 @@ export default class GameScene extends Phaser.Scene {
                 (password) => {
                     this.state.role = 'host';
                     this.network.selectRoleHost(password);
+                    this.ui.showLeaderboard('host');
                 }
             );
         }
@@ -238,19 +214,22 @@ export default class GameScene extends Phaser.Scene {
                     this.network.selectRolePlayer(name);
                     this.ui.showWaitingText();
                     this.ui.showGuideOverlay();
+                    this.ui.showLeaderboard('player');
                 }
             );
         }
     }
 
     update(time) {
-        if (window.innerHeight > window.innerWidth) return;
+        // [FIX] Đã bỏ dòng chặn màn hình dọc: if (window.innerHeight > window.innerWidth) return;
 
         if (this.players && this.network) {
             this.players.updateAllPositions(this.network);
 
-            if (this.state.role === 'host' && !this.state.isFinished) {
+            if (!this.state.isFinished) {
                 if (!this.lastLeaderboardUpdate || time - this.lastLeaderboardUpdate > 200) {
+
+                    // Gom tất cả ngựa (ngựa người khác + ngựa mình)
                     const allHorses = [...this.players.otherPlayers.getChildren()];
                     if (this.players.horse) allHorses.push(this.players.horse);
 
@@ -261,33 +240,20 @@ export default class GameScene extends Phaser.Scene {
                         horseColor: h.baseColor
                     }));
 
+                    // Sắp xếp theo vị trí X giảm dần (ai chạy xa hơn đứng trước)
                     sortedData.sort((a, b) => b.x - a.x);
 
-                    this.ui.updateHostLeaderboard(sortedData);
+                    // Gọi hàm update UI mới
+                    this.ui.updateLeaderboard(sortedData);
+
                     this.lastLeaderboardUpdate = time;
                 }
             }
         }
 
+        // [UPDATE] Gọi hàm updateDepths của PlayerManager để đồng bộ depth chính xác
         if (this.players) {
-            // 1. Ngựa của mình
-            if (this.players.horse && this.players.horse.active) {
-                this.players.horse.setDepth(this.players.horse.y);
-                if (this.players.horse.nameText) {
-                    this.players.horse.nameText.setDepth(this.players.horse.y + 10000);
-                }
-            }
-            // 2. Ngựa người khác
-            if (this.players.otherPlayers) {
-                this.players.otherPlayers.children.iterate((child) => {
-                    if (child && child.active) {
-                        child.setDepth(child.y);
-                        if (child.nameText) {
-                            child.nameText.setDepth(child.y + 10000);
-                        }
-                    }
-                });
-            }
+            this.players.updateDepths();
         }
 
         this.players?.updateHostCameraFollow();

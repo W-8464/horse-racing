@@ -111,35 +111,9 @@
 </head>
 
 <body>
-    <div id="rotate-overlay">
-        <div class="rotate-box">
-            🔄 Vui lòng xoay ngang màn hình<br />
-            để tiếp tục chơi
-        </div>
-    </div>
     <div id="game-container"></div>
-    <div id="version-tag">v2.5</div>
+    <div id="version-tag">v2.6</div>
     <script type="module" src="src/main.js"></script>
 </body>
 
 </html>
-
-<script>
-    const overlay = document.getElementById('rotate-overlay');
-
-    function checkOrientation() {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-
-        if (h > w) {
-            overlay.classList.add('active');
-        } else {
-            overlay.classList.remove('active');
-        }
-    }
-
-    checkOrientation();
-
-    window.addEventListener('resize', checkOrientation);
-    window.addEventListener('orientationchange', checkOrientation);
-</script>

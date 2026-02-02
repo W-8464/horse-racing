@@ -49,8 +49,6 @@ setInterval(() => {
 }, 1000 / TICK_RATE);
 
 io.on('connection', (socket) => {
-    console.log('Người chơi mới:', socket.id);
-
     socket.on('selectRole', (data) => {
         const { role, name, password, color } = data;
         socket.role = role;
@@ -160,8 +158,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log('Người chơi thoát:', socket.id);
-
         if (socket.id === gameState.hostId) {
             gameState.hostId = null;
             gameState.status = 'LOBBY';

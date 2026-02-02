@@ -36,7 +36,7 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
             }
         )
             .setOrigin(0.5)
-            .setDepth(DEPTH.UI);
+            .setDepth(DEPTH.HORSE);
 
         this._onAnimComplete = (anim) => {
             const key = anim?.key;

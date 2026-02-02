@@ -291,7 +291,7 @@ export default class EnvironmentManager {
                 stand.fillRect(x, currentY, sectionWidth, 2);
 
                 // Đặt Người (Khán giả)
-                const peopleCount = Math.floor(Math.random() * 8) + 3;
+                const peopleCount = Math.floor(Math.random()) + 3;
                 for (let p = 0; p < peopleCount; p++) {
                     const px = x + Math.random() * (sectionWidth - 20) + 10;
                     // Chỉnh toạ độ Y: +5 để chân người thấp hơn mép ghế một chút
@@ -355,8 +355,6 @@ export default class EnvironmentManager {
         const extraHeight = Math.max(0, this.worldHeight - this.baseHeight);
         const oldSkyHeight = this.skyHeight;
         this.skyHeight = this.baseSkyHeight + (extraHeight * 0.5);
-
-        const deltaY = this.skyHeight - oldSkyHeight;
 
         this.scene.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
         this.scene.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);

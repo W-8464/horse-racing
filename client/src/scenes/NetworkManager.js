@@ -77,11 +77,7 @@ export default class NetworkManager {
         });
 
         this.socket.on('raceReset', (players) => {
-            // if (!this.scene.state.sounds.bgm.isPlaying) {
-            //     this.scene.state.sounds.bgm.play();
-            // }
             this.scene.state.sounds.gallop.stop();
-            //this.scene.state.sounds.audience.stop();
 
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
@@ -98,13 +94,18 @@ export default class NetworkManager {
             this.ui.destroyWinner();
             this.ui.destroyStartButton();
             this.ui.destroyWaitingText();
-            this.ui.destroyPodium();
+            this.ui.destroyPodium(); // Xóa podium cũ
 
             if (this.state.role === 'host') {
                 this.ui.showStartButton(() => this.hostStartGame());
-                this.ui.showHostLeaderboard();
+                // [FIX] Host hiện lại bảng leaderboard (có nút refresh) khi reset game
+                this.ui.showLeaderboard('host');
             }
-            if (this.state.role === 'player') this.ui.showWaitingText();
+            if (this.state.role === 'player') {
+                this.ui.showWaitingText();
+                // [FIX] Player hiện lại bảng leaderboard (không nút refresh)
+                this.ui.showLeaderboard('player');
+            }
         });
 
         // auth host
@@ -115,21 +116,19 @@ export default class NetworkManager {
         this.socket.on('hostAccepted', () => {
             if (this.state.role !== 'host') return;
             this.ui.destroyHostPasswordInput();
-            this.ui.showHostLeaderboard();
             this.ui.showStartButton(() => this.hostStartGame());
+            // [FIX] Hiển thị leaderboard ngay khi host vào
+            this.ui.showLeaderboard('host');
         });
 
         this.socket.on('playerAccepted', () => {
             if (this.state.role === 'player') {
-                // player đã được server accept => chờ host start
                 this.ui.showWaitingText();
             }
         });
 
         this.socket.on('startCountdown', () => {
-            //if (this.scene.state.sounds.bgm.isPlaying) this.scene.state.sounds.bgm.stop();
             this.scene.state.sounds.countdown.play();
-            //this.scene.state.sounds.audience.play();
 
             this.ui.clearBeforeCountdown();
             this.state.isRaceStarted = false;
@@ -155,21 +154,18 @@ export default class NetworkManager {
             this.state.isRaceStarted = false;
             this.state.isFinished = true;
 
-            //this.scene.state.sounds.audience.stop();
             this.scene.state.sounds.gallop.stop();
-            // if (!this.scene.state.sounds.bgm.isPlaying) {
-            //     this.scene.state.sounds.bgm.play();
-            // }
 
             if (this.state.role === 'host') {
-                this.ui.updateHostLeaderboard(data.top10, data.top10);
+                // [FIX] Sửa tên hàm: updateHostLeaderboard -> updateLeaderboard
+                // Hàm này sẽ cập nhật dữ liệu lần cuối trước khi bị Podium đè lên
+                this.ui.updateLeaderboard(data.top10);
             }
 
             const top3 = data.top10.slice(0, 3);
 
-            this.ui.showPodium(top3, () => {
-                socket.emit('hostRestartGame');
-            });
+            // [FIX] Xóa callback thừa. Logic nút "Play Again" đã nằm trong UIManager rồi.
+            this.ui.showPodium(top3);
         });
 
         this.socket.on('gameStateUpdate', (data) => {

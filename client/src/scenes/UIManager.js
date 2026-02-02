@@ -89,9 +89,8 @@ export default class UIManager {
         const cx = w / 2;
         const cy = h / 2;
 
-        const baseW = GAME_SETTINGS.DESIGN_WIDTH || 1560;
-        const baseH = GAME_SETTINGS.DESIGN_HEIGHT || 720;
-        // Clamp scale để UI không quá nhỏ hoặc quá to
+        const baseW = GAME_SETTINGS.DESIGN_WIDTH;
+        const baseH = GAME_SETTINGS.DESIGN_HEIGHT;
         const s = Phaser.Math.Clamp(Math.min(w / baseW, h / baseH), 0.65, 1.2);
 
         return { w, h, cx, cy, s };
@@ -101,8 +100,6 @@ export default class UIManager {
         const { w, h, cx, cy, s } = this._getLayout();
         const inputY = Math.round(h * this._ratioInputY);
         const countdownY = Math.round(h * this._ratioCountdownY);
-
-        // Scale giới hạn cho các popup để đảm bảo vừa màn hình nhỏ
         const clampedScale = Math.min(s, h / 500);
 
         // 1. Input Forms
@@ -313,8 +310,14 @@ export default class UIManager {
         }
 
         const { cx } = this._getLayout();
-        const txt = this.scene.add.text(cx, 200, timeLeft.toString(), { fontSize: '96px', fontStyle: 'bold', color: '#ff1744' })
-            .setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH.UI);
+        const txt = this.scene.add.text(cx, 200, timeLeft.toString(), {
+            fontSize: '96px',
+            fontStyle: 'bold',
+            color: '#ff1744',
+            stroke: '#000000',
+            strokeThickness: 8
+        })
+            .setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH.OVERLAY);
         this.countdownText = txt;
         this.layout();
 
@@ -340,40 +343,62 @@ export default class UIManager {
         });
     }
 
-    showHostLeaderboard() {
+    showLeaderboard(role) {
         if (this.hostLeaderboardDom) return;
+
+        // Chỉ hiển thị nút restart nếu là HOST
+        const restartBtnHTML = (role === 'host')
+            ? `<button id="restartBtn" style="${REFRESH_BTN_STYLE}" title="Reset Race">↻</button>`
+            : '';
+
         this.hostLeaderboardDom = this.scene.add.dom(0, 0).createFromHTML(`
-    <div id="unified-leaderboard" style="${LEADERBOARD_CONTAINER_STYLE}">
-        <div style="display: flex; justify-content: center; align-items: center; border-bottom: 2px solid #ffeb3b; margin-bottom: 10px; padding-bottom: 5px;">
-            <h2 style="color:#ffeb3b; margin:0; font-size:18px; font-family: 'Courier New', monospace;">LEADERBOARD</h2>
-            <button id="restartBtn" style="${REFRESH_BTN_STYLE}" title="Reset Race">↻</button>
+        <div id="unified-leaderboard" style="${LEADERBOARD_CONTAINER_STYLE}">
+            <div style="display: flex; justify-content: center; align-items: center; border-bottom: 2px solid #ffeb3b; margin-bottom: 10px; padding-bottom: 5px;">
+                <h2 style="color:#ffeb3b; margin:0; font-size:18px; font-family: 'Courier New', monospace;">LEADERBOARD</h2>
+                ${restartBtnHTML} 
+            </div>
+            <div id="leaderboard-list"></div>
         </div>
-        <div id="leaderboard-list"></div>
-    </div>
-    `).setScrollFactor(0).setDepth(DEPTH.UI + 10);
-        this.hostLeaderboardDom.addListener('click');
-        this.hostLeaderboardDom.on('click', (e) => {
-            if (e.target.id === 'restartBtn') {
-                e.target.style.transform = 'rotate(180deg)';
-                setTimeout(() => { e.target.style.transform = 'rotate(0deg)'; }, 200);
-                this.scene.events.emit('restartRequested');
-            }
-        });
+        `).setScrollFactor(0).setDepth(DEPTH.UI); // Đảm bảo ngang hàng UI
+
+        // Chỉ bắt sự kiện click nếu là host (vì player không có nút này)
+        if (role === 'host') {
+            this.hostLeaderboardDom.addListener('click');
+            this.hostLeaderboardDom.on('click', (e) => {
+                if (e.target.id === 'restartBtn') {
+                    e.target.style.transform = 'rotate(180deg)';
+                    setTimeout(() => { e.target.style.transform = 'rotate(0deg)'; }, 200);
+                    this.scene.events.emit('restartRequested');
+                }
+            });
+        }
+
         this.layout();
     }
 
-    updateHostLeaderboard(sortedPlayers) {
+    // [SỬA TÊN HÀM CHO ĐỒNG BỘ]
+    updateLeaderboard(sortedPlayers) {
         if (!this.hostLeaderboardDom) return;
+
         const listContainer = this.hostLeaderboardDom.getChildByID('leaderboard-list');
         if (!listContainer) return;
+
         const finishedData = this.state.finishedPlayers || [];
-        const top10 = sortedPlayers.slice(0, 10);
-        listContainer.innerHTML = top10.map((player, index) => {
+        // Player màn hình nhỏ, có thể chỉ nên hiện Top 5 thay vì Top 10 nếu muốn gọn
+        const topCount = 10;
+        const topList = sortedPlayers.slice(0, topCount);
+
+        listContainer.innerHTML = topList.map((player, index) => {
             const finishEntry = finishedData.find(f => f.id === player.id);
             const timeText = finishEntry ? `<span style="color:#ffeb3b; font-size:12px;">${finishEntry.finishTime}s</span>` : '';
             const isFirst = index === 0;
+            // Highlight tên mình (nếu là player)
+            const isMe = (player.id === this.scene.network?.socket?.id);
+            const nameColor = isFirst ? '#ffeb3b' : (isMe ? '#ffffff' : '#5dfc9b');
+            const rowStyle = isMe ? 'font-weight:bold; background:rgba(255,255,255,0.1);' : '';
+
             return `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 14px; color: ${isFirst ? '#ffeb3b' : '#5dfc9b'}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 14px; color: ${nameColor}; ${rowStyle}">
                 <span>#${index + 1} ${player.name.substring(0, 8)}</span>
                 ${timeText}
             </div>
@@ -419,10 +444,10 @@ export default class UIManager {
         const { w, h, cx, cy } = this._getLayout();
 
         this.podiumContainer = this.scene.add.container(cx, cy)
-            .setDepth(30000)
+            .setDepth(DEPTH.OVERLAY)
             .setScrollFactor(0);
 
-        const overlay = this.scene.add.rectangle(0, 0, w * 3, h * 3, 0x000000, 0.85);
+        const overlay = this.scene.add.rectangle(0, 0, w * 4, h * 4, 0x000000, 0.85);
         overlay.setInteractive();
         this.podiumContainer.add(overlay);
 
@@ -516,7 +541,7 @@ export default class UIManager {
             fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffffff'
         }).setOrigin(0.5);
         this.helpBtn = this.scene.add.container(x, y, [bg, text])
-            .setScrollFactor(0).setDepth(DEPTH.UI + 50)
+            .setScrollFactor(0).setDepth(DEPTH.UI)
             .setInteractive(new Phaser.Geom.Circle(0, 0, 20), Phaser.Geom.Circle.Contains);
         this.helpBtn.on('pointerdown', () => { this.helpBtn.setScale(0.9); });
         this.helpBtn.on('pointerup', () => { this.helpBtn.setScale(1); this.showGuideOverlay(); });
@@ -540,10 +565,10 @@ export default class UIManager {
 
         // [SỬA ĐỔI] Tạo container mà không set scale ở đây
         this.guideContainer = this.scene.add.container(cx, cy)
-            .setDepth(30000)
+            .setDepth(DEPTH.OVERLAY)
             .setScrollFactor(0);
 
-        const overlay = this.scene.add.rectangle(0, 0, w * 2, h * 2, 0x000000, 0.85);
+        const overlay = this.scene.add.rectangle(0, 0, w * 4, h * 4, 0x000000, 0.85);
         overlay.setInteractive();
         this.guideContainer.add(overlay);
 
@@ -575,7 +600,7 @@ export default class UIManager {
             fontSize: '24px', fontFamily: 'monospace', fontStyle: 'bold'
         }).setOrigin(0.5);
         closeBtn.add([closeBg, closeTxt]);
-        closeBtn.setInteractive(new Phaser.Geom.Circle(0, 0, 20), Phaser.Geom.Circle.Contains);
+        closeBtn.setInteractive(new Phaser.Geom.Circle(0, 0, 35), Phaser.Geom.Circle.Contains);
         closeBtn.on('pointerdown', () => { this.destroyGuideOverlay(); });
         this.guideContainer.add(closeBtn);
 

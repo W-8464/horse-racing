@@ -40,7 +40,13 @@ export const DEPTH = {
     CLOUD: 1,
     GRASS: 2,
     CHECK_LINE: 3,
-    HORSE: 5,
-    LANTERN: 15,
-    UI: 100
+    HORSE: 10,       // Đây chỉ là base, thực tế sẽ là giá trị Y (từ 0 đến ~500)
+
+    // Tên người chơi: Y + offset. 
+    // Max Y là ~500, cộng thêm offset 1000 = 1500. Vẫn thấp hơn UI.
+    NAME_OFFSET: 1000,
+
+    UI: 5000,        // Cao hơn hẳn mọi objects trong game
+    OVERLAY: 6000,   // Podium, Guide
+    FIREWORK: 7000   // Pháo hoa cao nhất
 };
