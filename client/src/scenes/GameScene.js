@@ -6,6 +6,7 @@ import UIManager from './UIManager.js';
 import NetworkManager from './NetworkManager.js';
 import FlashSkillManager from './FlashSkillManager.js';
 import InputManager from './InputManager.js';
+import FireworksManager from './FireworksManager.js';
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -103,6 +104,8 @@ export default class GameScene extends Phaser.Scene {
         // anims
         this.createAnimations();
 
+        this.fireworks = new FireworksManager(this);
+
         // managers
         this.players = new PlayerManager(this, this.state);
         this.players.init();
@@ -183,6 +186,10 @@ export default class GameScene extends Phaser.Scene {
         cam.setBounds(0, 0, GAME_SETTINGS.WORLD_WIDTH, worldHeight);
 
         this.env?.resize(worldHeight);
+
+        if (this.players) {
+            this.players.refreshHorseYPositions();
+        }
 
         this.ui?.layout();
     }

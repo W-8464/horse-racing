@@ -1,3 +1,4 @@
+// UIManager.js
 import { GAME_SETTINGS, DEPTH } from '../config/config.js';
 
 const PIXEL_INPUT_STYLE = `
@@ -73,13 +74,13 @@ export default class UIManager {
         this.countdownText = null;
         this.finishRankText = null;
 
-        this.winnerOverlay = null;
-        this.winnerContainer = null;
+        this.podiumContainer = null;
+        this.guideContainer = null;
+        this.helpBtn = null;
+        this.hostLeaderboardDom = null;
 
         this._ratioInputY = 0.45;
         this._ratioCountdownY = 0.35;
-
-        this.hostLeaderboardDom = null;
     }
 
     _getLayout() {
@@ -88,8 +89,9 @@ export default class UIManager {
         const cx = w / 2;
         const cy = h / 2;
 
-        const baseW = GAME_SETTINGS.DESIGN_WIDTH;
-        const baseH = GAME_SETTINGS.DESIGN_HEIGHT;
+        const baseW = GAME_SETTINGS.DESIGN_WIDTH || 1560;
+        const baseH = GAME_SETTINGS.DESIGN_HEIGHT || 720;
+        // Clamp scale để UI không quá nhỏ hoặc quá to
         const s = Phaser.Math.Clamp(Math.min(w / baseW, h / baseH), 0.65, 1.2);
 
         return { w, h, cx, cy, s };
@@ -99,8 +101,11 @@ export default class UIManager {
         const { w, h, cx, cy, s } = this._getLayout();
         const inputY = Math.round(h * this._ratioInputY);
         const countdownY = Math.round(h * this._ratioCountdownY);
+
+        // Scale giới hạn cho các popup để đảm bảo vừa màn hình nhỏ
         const clampedScale = Math.min(s, h / 500);
 
+        // 1. Input Forms
         if (this.playerNameDom) {
             this.playerNameDom.setPosition(cx, inputY);
             this.playerNameDom.setScale(clampedScale);
@@ -110,47 +115,65 @@ export default class UIManager {
             this.hostPassDom.setScale(clampedScale);
         }
 
+        // 2. Waiting & Start
         if (this.waitingText) {
             this.waitingText.setPosition(cx, inputY);
             this.waitingText.setFontSize(Math.round(28 * clampedScale));
         }
         if (this.startButton) {
             this.startButton.setPosition(cx, inputY);
-            // Không scale container để tránh lệch hit-area.
+            this.startButton.setScale(clampedScale);
         }
         if (this.countdownText) {
             this.countdownText.setPosition(cx, countdownY);
             this.countdownText.setFontSize(Math.round(96 * clampedScale));
         }
 
+        // 3. Leaderboard (DOM)
         if (this.hostLeaderboardDom) {
-            // Thay vì setPosition theo tâm màn hình, ta để CSS top/right lo việc này
-            // Hoặc nếu muốn dùng setPosition của Phaser:
             this.hostLeaderboardDom.setPosition(w - 20, 20);
-            this.hostLeaderboardDom.setOrigin(1, 0); // Gốc tọa độ tại góc trên bên phải của DOM
+            this.hostLeaderboardDom.setOrigin(1, 0);
+            // DOM scale CSS handles itself mostly, or we can transform scale
+            this.hostLeaderboardDom.setScale(clampedScale);
         }
 
-        if (this.winnerOverlay) {
-            this.winnerOverlay.setPosition(cx, cy);
-            this.winnerOverlay.setSize(w, h);
+        // --- [NEW] Cập nhật vị trí và scale cho Podium ---
+        if (this.podiumContainer) {
+            this.podiumContainer.setPosition(cx, cy);
+            this.podiumContainer.setScale(clampedScale * 0.7);
+            // Overlay bên trong podiumContainer đã được vẽ w*2, h*2 nên không cần resize lại
         }
-        if (this.winnerContainer) {
-            this.winnerContainer.setPosition(cx, cy);
+
+        // --- [NEW] Cập nhật vị trí và scale cho Guide Overlay ---
+        if (this.guideContainer) {
+            this.guideContainer.setPosition(cx, cy);
+            this.guideContainer.setScale(clampedScale);
+        }
+
+        // --- [NEW] Cập nhật scale cho nút Help ---
+        if (this.helpBtn) {
+            this.helpBtn.setScale(clampedScale);
+            // Vị trí cố định góc trái, chỉ cần scale
+        }
+
+        // Finish Rank Text
+        if (this.finishRankText) {
+            this.finishRankText.setPosition(cx, cy - 100 * clampedScale);
+            this.finishRankText.setScale(clampedScale);
         }
     }
 
     isWinnerOpen() {
-        return !!(this.winnerOverlay || this.winnerContainer);
+        return !!this.podiumContainer;
     }
+
+    // ... (Các hàm showPlayerNameInput, showHostPasswordInput giữ nguyên) ...
 
     showPlayerNameInput(onJoin) {
         const { cx, cy } = this._getLayout();
-
         const dom = this.scene.add.dom(cx, cy).createFromHTML(`
       <div style="text-align:center">
-        <div style="color:#5dfc9b;font-family:monospace;font-size:32px;margin-bottom:10px">
-          ENTER NAME
-        </div>
+        <div style="color:#5dfc9b;font-family:monospace;font-size:32px;margin-bottom:10px">ENTER NAME</div>
         <input id="playerName" type="text" style="${PIXEL_INPUT_STYLE}" />
         <br/><br/>
         <div style="display: flex; gap: 10px; justify-content: center;">
@@ -158,9 +181,7 @@ export default class UIManager {
         </div>
       </div>
     `).setDepth(DEPTH.UI).setScrollFactor(0);
-
         this.playerNameDom = dom;
-
         dom.addListener('click');
         dom.on('click', (e) => {
             if (e.target.id === 'joinBtn') {
@@ -171,7 +192,6 @@ export default class UIManager {
                 onJoin?.(name);
             }
         });
-
         this.layout();
     }
 
@@ -184,24 +204,16 @@ export default class UIManager {
 
     showHostPasswordInput(onConfirm) {
         const { cx } = this._getLayout();
-
         const dom = this.scene.add.dom(cx, 300).createFromHTML(`
       <div style="text-align:center">
-        <div style="color:#ff1744;font-family:monospace;font-size:20px;margin-bottom:10px">
-          HOST ACCESS
-        </div>
+        <div style="color:#ff1744;font-family:monospace;font-size:20px;margin-bottom:10px">HOST ACCESS</div>
         <input id="hostPass" type="password" style="${PIXEL_INPUT_STYLE}" />
         <br/><br/>
         <button id="hostBtn" style="${PIXEL_BTN_STYLE}">CONFIRM</button>
-        <div id="error"
-          style="color:#ff1744;font-family:monospace;font-size:14px;margin-top:8px;display:none">
-          INVALID PASSWORD
-        </div>
+        <div id="error" style="color:#ff1744;font-family:monospace;font-size:14px;margin-top:8px;display:none">INVALID PASSWORD</div>
       </div>
     `).setDepth(DEPTH.UI).setScrollFactor(0);
-
         this.hostPassDom = dom;
-
         dom.addListener('click');
         dom.on('click', (e) => {
             if (e.target.id === 'hostBtn') {
@@ -210,7 +222,6 @@ export default class UIManager {
                 onConfirm?.(pass);
             }
         });
-
         this.layout();
     }
 
@@ -229,16 +240,9 @@ export default class UIManager {
 
     showWaitingText() {
         if (this.waitingText) return;
-
         const { cx } = this._getLayout();
-
-        this.waitingText = this.scene.add.text(
-            cx,
-            300,
-            'Waiting to start...',
-            { fontSize: '28px', fontFamily: 'monospace', color: '#ffffff' }
-        ).setOrigin(0.5).setDepth(DEPTH.UI);
-
+        this.waitingText = this.scene.add.text(cx, 300, 'Waiting to start...', { fontSize: '28px', fontFamily: 'monospace', color: '#ffffff' })
+            .setOrigin(0.5).setDepth(DEPTH.UI);
         this.layout();
     }
 
@@ -251,31 +255,19 @@ export default class UIManager {
 
     showStartButton(onStart) {
         if (this.startButton) return;
-
         const { cx } = this._getLayout();
-
         const btnBg = this.scene.add.graphics()
             .fillStyle(0x00c853, 1).lineStyle(4, 0x008a39, 1)
             .fillRoundedRect(-100, -40, 200, 80, 5)
             .strokeRoundedRect(-100, -40, 200, 80, 5)
             .lineStyle(2, 0x5dfc9b, 1)
             .strokeRoundedRect(-94, -34, 188, 68, 3);
-
         const btnText = this.scene.add.text(0, 0, 'START', {
-            fontSize: '40px',
-            fontFamily: 'monospace',
-            fontStyle: 'bold',
-            color: '#ffffff'
+            fontSize: '40px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffffff'
         }).setOrigin(0.5);
-
         this.startButton = this.scene.add.container(cx, 300, [btnBg, btnText])
-            .setScrollFactor(0)
-            .setSize(200, 80)
-            .setInteractive({ useHandCursor: true })
-            .setDepth(DEPTH.UI);
-
+            .setScrollFactor(0).setSize(200, 80).setInteractive({ useHandCursor: true }).setDepth(DEPTH.UI);
         this.startButton.on('pointerdown', () => onStart?.());
-
         this.layout();
     }
 
@@ -290,26 +282,24 @@ export default class UIManager {
         const gameCanvas = this.scene.game.canvas;
         const parent = gameCanvas.parentElement;
         if (!parent) return;
-
         parent.querySelectorAll('.phaser-dom-element').forEach(el => el.remove());
     }
 
     clearBeforeCountdown() {
         this.clearAllDomElements();
-
         this.destroyPlayerNameInput();
         this.destroyHostPasswordInput();
         this.destroyWaitingText();
         this.destroyStartButton();
         this.destroyWinner();
-
         this.destroyGuideOverlay();
         this.destroyHelpButton();
+        this.destroyPodium(); // Đảm bảo destroy podium cũ nếu có
     }
 
     startCountdown() {
         this.state.isCountdownRunning = true;
-        let timeLeft = GAME_SETTINGS.COUNTDOWN_TIME;
+        let timeLeft = GAME_SETTINGS.COUNTDOWN_TIME || 3;
 
         if (this.countdownText) {
             this.countdownText.destroy();
@@ -317,16 +307,9 @@ export default class UIManager {
         }
 
         const { cx } = this._getLayout();
-
-        const txt = this.scene.add.text(
-            cx,
-            200,
-            timeLeft.toString(),
-            { fontSize: '96px', fontStyle: 'bold', color: '#ff1744' }
-        ).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH.UI);
-
+        const txt = this.scene.add.text(cx, 200, timeLeft.toString(), { fontSize: '96px', fontStyle: 'bold', color: '#ff1744' })
+            .setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH.UI);
         this.countdownText = txt;
-
         this.layout();
 
         this.scene.time.addEvent({
@@ -338,11 +321,9 @@ export default class UIManager {
                     txt.setText(timeLeft.toString());
                     return;
                 }
-
                 txt.setText('GO!');
                 this.state.isRaceStarted = true;
                 this.state.isCountdownRunning = false;
-
                 this.scene.time.delayedCall(800, () => {
                     if (this.countdownText) {
                         this.countdownText.destroy();
@@ -355,48 +336,36 @@ export default class UIManager {
 
     showHostLeaderboard() {
         if (this.hostLeaderboardDom) return;
-
         this.hostLeaderboardDom = this.scene.add.dom(0, 0).createFromHTML(`
     <div id="unified-leaderboard" style="${LEADERBOARD_CONTAINER_STYLE}">
         <div style="display: flex; justify-content: center; align-items: center; border-bottom: 2px solid #ffeb3b; margin-bottom: 10px; padding-bottom: 5px;">
-            <h2 style="color:#ffeb3b; margin:0; font-size:18px; font-family: 'Courier New', monospace;">
-                LEADERBOARD
-            </h2>
-            <button id="restartBtn" style="${REFRESH_BTN_STYLE}" title="Reset Race">
-                ↻
-            </button>
+            <h2 style="color:#ffeb3b; margin:0; font-size:18px; font-family: 'Courier New', monospace;">LEADERBOARD</h2>
+            <button id="restartBtn" style="${REFRESH_BTN_STYLE}" title="Reset Race">↻</button>
         </div>
         <div id="leaderboard-list"></div>
     </div>
     `).setScrollFactor(0).setDepth(DEPTH.UI + 10);
-
         this.hostLeaderboardDom.addListener('click');
         this.hostLeaderboardDom.on('click', (e) => {
             if (e.target.id === 'restartBtn') {
                 e.target.style.transform = 'rotate(180deg)';
                 setTimeout(() => { e.target.style.transform = 'rotate(0deg)'; }, 200);
-
                 this.scene.events.emit('restartRequested');
             }
         });
-
         this.layout();
     }
 
     updateHostLeaderboard(sortedPlayers) {
         if (!this.hostLeaderboardDom) return;
-
         const listContainer = this.hostLeaderboardDom.getChildByID('leaderboard-list');
         if (!listContainer) return;
-
         const finishedData = this.state.finishedPlayers || [];
         const top10 = sortedPlayers.slice(0, 10);
-
         listContainer.innerHTML = top10.map((player, index) => {
             const finishEntry = finishedData.find(f => f.id === player.id);
             const timeText = finishEntry ? `<span style="color:#ffeb3b; font-size:12px;">${finishEntry.finishTime}s</span>` : '';
             const isFirst = index === 0;
-
             return `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 14px; color: ${isFirst ? '#ffeb3b' : '#5dfc9b'}">
                 <span>#${index + 1} ${player.name.substring(0, 8)}</span>
@@ -415,62 +384,37 @@ export default class UIManager {
 
     showLocalFinishRank(rank) {
         const { cx, cy } = this._getLayout();
-
         if (this.finishRankText) this.finishRankText.destroy();
-
         this.finishRankText = this.scene.add.text(
             cx, cy - 100,
             `YOU FINISHED!\nRANK: ${rank}`,
-            {
-                fontSize: '32px',
-                fontFamily: 'monospace',
-                color: '#003b1f',
-                align: 'center',
-            }
+            { fontSize: '32px', fontFamily: 'monospace', color: '#003b1f', align: 'center' }
         ).setOrigin(0.5).setDepth(DEPTH.UI).setScrollFactor(0);
+        this.layout();
     }
-
-    /**
-     * Hiển thị bục vinh quang Top 3
-     * @param {Array} top3Data - Mảng chứa { name, horseColor, finishTime } của top 3
-     * @param {Function} onRestart - Callback khi host bấm nút Restart
-     */
 
     showPodium(top3Data) {
         this.clearAllDomElements();
-
         if (this.hostLeaderboardDom) {
             this.hostLeaderboardDom.destroy();
             this.hostLeaderboardDom = null;
         }
-
         if (this.podiumContainer) this.podiumContainer.destroy();
 
         const { w, h, cx, cy } = this._getLayout();
 
-        let contentScale = 1;
-        if (h < 800) contentScale = 0.75;
-        if (h < 500) contentScale = 0.6;
-
         this.podiumContainer = this.scene.add.container(cx, cy)
             .setDepth(2000)
-            .setScrollFactor(0)
-            .setScale(contentScale);
+            .setScrollFactor(0);
 
-        // Nền mờ
-        const overlay = this.scene.add.rectangle(0, 0, w * 2, h * 2, 0x000000, 0.85);
+        const overlay = this.scene.add.rectangle(0, 0, w * 3, h * 3, 0x000000, 0.85);
         overlay.setInteractive();
         this.podiumContainer.add(overlay);
 
         let titleY = -220;
-        if (h < 500) titleY = -210;
-
         const titleText = this.scene.add.text(0, titleY, "VICTORY", {
             fontFamily: 'monospace', fontSize: '60px', color: '#ffeb3b', fontStyle: 'bold'
         }).setOrigin(0.5);
-
-        if (h < 500) titleText.setScale(0.8);
-
         this.podiumContainer.add(titleText);
 
         const podiumConfig = [
@@ -482,42 +426,26 @@ export default class UIManager {
         podiumConfig.forEach(cfg => {
             const playerData = top3Data[cfg.dataIdx];
             if (!playerData) return;
-
-            // Bục
             const box = this.scene.add.graphics();
             box.fillStyle(cfg.color, 1);
             box.lineStyle(4, 0xffffff, 1);
             box.fillRect(cfg.x - 70, cfg.y, 140, cfg.height);
             box.strokeRect(cfg.x - 70, cfg.y, 140, cfg.height);
             this.podiumContainer.add(box);
-
-            // Số hạng
             const rankTxt = this.scene.add.text(cfg.x, cfg.y + 40, `#${cfg.rank}`, {
                 fontSize: '40px', fontFamily: 'monospace', color: '#000000', fontStyle: 'bold'
             }).setOrigin(0.5);
             this.podiumContainer.add(rankTxt);
-
-            // Ngựa
             const horseSprite = this.scene.add.sprite(cfg.x, cfg.y - 60, 'idle');
             horseSprite.setScale(0.6);
-            if (playerData.horseColor) {
-                horseSprite.setTint(playerData.horseColor);
-            }
+            if (playerData.horseColor) horseSprite.setTint(playerData.horseColor);
             horseSprite.play('horse_idle');
             this.podiumContainer.add(horseSprite);
-
-            // Tên
             const nameTxt = this.scene.add.text(cfg.x, cfg.y - 150, playerData.name, {
-                fontSize: '24px',
-                fontFamily: 'monospace',
-                color: '#ffffff',
-                fontStyle: 'bold',
-                backgroundColor: '#000000aa',
-                padding: { x: 8, y: 4 }
+                fontSize: '24px', fontFamily: 'monospace', color: '#ffffff', fontStyle: 'bold',
+                backgroundColor: '#000000aa', padding: { x: 8, y: 4 }
             }).setOrigin(0.5);
             this.podiumContainer.add(nameTxt);
-
-            // Thời gian
             const timeTxt = this.scene.add.text(cfg.x, cfg.y + cfg.height + 25, `${playerData.finishTime}s`, {
                 fontSize: '20px', fontFamily: 'monospace', color: '#ffff00', fontStyle: 'bold'
             }).setOrigin(0.5);
@@ -530,37 +458,25 @@ export default class UIManager {
             });
             this.podiumContainer.add(btnContainer);
         }
+
+        this.layout();
     }
 
     createPhaserButton(x, y, text, callback) {
         const container = this.scene.add.container(x, y);
-
         const bg = this.scene.add.graphics();
         bg.fillStyle(0x00c853, 1);
         bg.fillRoundedRect(-80, -25, 160, 50, 10);
         bg.lineStyle(2, 0xffffff, 1);
         bg.strokeRoundedRect(-80, -25, 160, 50, 10);
-
         const txt = this.scene.add.text(0, 0, text, {
             fontSize: '20px', fontFamily: 'monospace', fontStyle: 'bold'
         }).setOrigin(0.5);
-
         container.add([bg, txt]);
         container.setInteractive(new Phaser.Geom.Rectangle(-80, -25, 160, 50), Phaser.Geom.Rectangle.Contains);
-
-        container.on('pointerdown', () => {
-            container.setScale(0.95);
-        });
-
-        container.on('pointerout', () => {
-            container.setScale(1);
-        });
-
-        container.on('pointerup', () => {
-            container.setScale(1);
-            callback();
-        });
-
+        container.on('pointerdown', () => { container.setScale(0.95); });
+        container.on('pointerout', () => { container.setScale(1); });
+        container.on('pointerup', () => { container.setScale(1); callback(); });
         return container;
     }
 
@@ -573,45 +489,24 @@ export default class UIManager {
 
     showHelpButton() {
         if (this.helpBtn) return;
-
-        // Vị trí: Cách lề trái 40px, lề trên 40px
         const x = 40;
         const y = 40;
-
         const bg = this.scene.add.graphics();
-
-        // --- SỬA ĐỔI: Màu dịu hơn ---
-        // Nền đen mờ (Alpha 0.5), không dùng màu xanh neon nữa
         bg.fillStyle(0x000000, 0.5);
-        // Viền trắng mờ
         bg.lineStyle(2, 0xffffff, 0.6);
-
-        // --- SỬA ĐỔI: Kích thước nhỏ hơn ---
-        // Bán kính giảm từ 25 -> 18
         bg.fillCircle(0, 0, 18);
         bg.strokeCircle(0, 0, 18);
-
         const text = this.scene.add.text(0, 0, '?', {
-            fontSize: '22px', // Giảm font từ 30 -> 22
-            fontFamily: 'monospace',
-            fontStyle: 'bold',
-            color: '#ffffff' // Chữ màu trắng
+            fontSize: '22px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffffff'
         }).setOrigin(0.5);
-
         this.helpBtn = this.scene.add.container(x, y, [bg, text])
-            .setScrollFactor(0)
-            .setDepth(DEPTH.UI + 50)
-            // Cập nhật vùng bấm theo kích thước mới
+            .setScrollFactor(0).setDepth(DEPTH.UI + 50)
             .setInteractive(new Phaser.Geom.Circle(0, 0, 20), Phaser.Geom.Circle.Contains);
+        this.helpBtn.on('pointerdown', () => { this.helpBtn.setScale(0.9); });
+        this.helpBtn.on('pointerup', () => { this.helpBtn.setScale(1); this.showGuideOverlay(); });
 
-        this.helpBtn.on('pointerdown', () => {
-            this.helpBtn.setScale(0.9);
-        });
-
-        this.helpBtn.on('pointerup', () => {
-            this.helpBtn.setScale(1);
-            this.showGuideOverlay();
-        });
+        // [SỬA ĐỔI] Gọi layout để scale nút help nếu cần
+        this.layout();
     }
 
     destroyHelpButton() {
@@ -621,29 +516,23 @@ export default class UIManager {
         }
     }
 
-    // 2. Hàm hiển thị Bảng Hướng Dẫn (Overlay)
     showGuideOverlay() {
-        // Nếu đang hiện rồi thì không tạo thêm
         if (this.guideContainer) return;
-
-        // Ẩn nút ? tạm thời khi đang xem hướng dẫn
         if (this.helpBtn) this.helpBtn.setVisible(false);
 
         const { w, h, cx, cy } = this._getLayout();
 
+        // [SỬA ĐỔI] Tạo container mà không set scale ở đây
         this.guideContainer = this.scene.add.container(cx, cy)
-            .setDepth(DEPTH.UI + 100) // Luôn nằm trên cùng
+            .setDepth(DEPTH.UI + 100)
             .setScrollFactor(0);
 
-        // Nền đen mờ che game
         const overlay = this.scene.add.rectangle(0, 0, w * 2, h * 2, 0x000000, 0.85);
-        overlay.setInteractive(); // Chặn click xuống dưới
+        overlay.setInteractive();
         this.guideContainer.add(overlay);
 
-        // Khung bảng hướng dẫn
         const bgWidth = 500;
         const bgHeight = 350;
-
         const panel = this.scene.add.graphics();
         panel.fillStyle(0x111111, 1);
         panel.lineStyle(4, 0x5dfc9b, 1);
@@ -651,40 +540,31 @@ export default class UIManager {
         panel.strokeRoundedRect(-bgWidth / 2, -bgHeight / 2, bgWidth, bgHeight, 10);
         this.guideContainer.add(panel);
 
-        // Nội dung hướng dẫn
         const title = this.scene.add.text(0, -120, "HOW TO PLAY", {
             fontSize: '40px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffeb3b'
         }).setOrigin(0.5);
 
-        const guideText =
-            "TAP screen repeatedly\n\n" +
-            "Run fast to win!";
-
+        const guideText = "TAP screen repeatedly\n\n" + "Run fast to win!";
         const content = this.scene.add.text(0, 0, guideText, {
             fontSize: '24px', fontFamily: 'monospace', color: '#ffffff', align: 'center', lineHeight: 40
         }).setOrigin(0.5);
 
         this.guideContainer.add([title, content]);
 
-        // Nút X (Đóng)
         const closeBtn = this.scene.add.container(bgWidth / 2 - 30, -bgHeight / 2 + 30);
-
         const closeBg = this.scene.add.graphics();
         closeBg.fillStyle(0xff1744, 1);
         closeBg.fillCircle(0, 0, 20);
-
         const closeTxt = this.scene.add.text(0, 0, 'X', {
             fontSize: '24px', fontFamily: 'monospace', fontStyle: 'bold'
         }).setOrigin(0.5);
-
         closeBtn.add([closeBg, closeTxt]);
         closeBtn.setInteractive(new Phaser.Geom.Circle(0, 0, 20), Phaser.Geom.Circle.Contains);
-
-        closeBtn.on('pointerdown', () => {
-            this.destroyGuideOverlay();
-        });
-
+        closeBtn.on('pointerdown', () => { this.destroyGuideOverlay(); });
         this.guideContainer.add(closeBtn);
+
+        // [SỬA ĐỔI] Gọi layout để áp dụng scale
+        this.layout();
     }
 
     destroyGuideOverlay() {
@@ -692,11 +572,9 @@ export default class UIManager {
             this.guideContainer.destroy();
             this.guideContainer = null;
         }
-        // Hiện lại nút ? nếu đang ở trạng thái chờ
         if (this.helpBtn) {
             this.helpBtn.setVisible(true);
         } else {
-            // Nếu chưa có nút ? thì tạo mới (trường hợp lần đầu đóng guide)
             this.showHelpButton();
         }
     }

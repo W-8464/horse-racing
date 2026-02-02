@@ -22,7 +22,7 @@ let gameState = {
 };
 let startTime = 0;
 let finishedPlayers = [];
-const FINISH_LINE_X = 5400;
+const FINISH_LINE_X = 400;
 const COUNTDOWN_TIME = 3;
 
 const TICK_RATE = 10;
@@ -134,6 +134,10 @@ io.on('connection', (socket) => {
             });
 
             socket.emit('youFinished', { rank: finishedPlayers.length });
+
+            if (finishedPlayers.length === 1) {
+                io.emit('firstFinished');
+            }
 
             const totalPlayers = Object.keys(players).length;
             const limit = Math.min(10, totalPlayers);

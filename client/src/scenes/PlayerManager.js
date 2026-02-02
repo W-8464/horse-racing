@@ -14,6 +14,18 @@ export default class PlayerManager {
         this.otherPlayers = this.scene.physics.add.group();
     }
 
+    getVisualY(serverY) {
+        const BASE_SKY_HEIGHT = 110;
+        const currentSkyHeight = this.scene.env ? this.scene.env.skyHeight : BASE_SKY_HEIGHT;
+        const offset = currentSkyHeight - BASE_SKY_HEIGHT;
+
+        if (Math.abs(offset) < 5) {
+            return serverY;
+        }
+
+        return serverY + offset;
+    }
+
     syncCurrentPlayers(players, myId) {
         Object.keys(players).forEach((id) => {
             if (id === myId) this.addSelf(players[id]);
@@ -24,23 +36,34 @@ export default class PlayerManager {
     addSelf(playerInfo) {
         if (!playerInfo) return;
 
+        const visualY = this.getVisualY(playerInfo.y);
+
         if (this.horse) {
-            this.horse.y = playerInfo.y;
+            this.horse.y = visualY;
             this.horse.serverIndex = playerInfo.serverIndex;
-            this.horse.setDepth(playerInfo.y);
+            // Cập nhật lại baseServerY nếu có thay đổi
+            this.horse.baseServerY = playerInfo.y;
+            this.horse.setDepth(visualY);
+
+            if (this.horse.nameText) {
+                this.horse.nameText.setDepth(visualY + 10000);
+            }
             return;
         }
 
         this.horse = new Horse(
             this.scene,
             playerInfo.x,
-            playerInfo.y,
+            visualY,
             'horse',
             playerInfo.id,
             playerInfo.horseColor,
             playerInfo.name,
             true
         );
+
+        // [FIX] Lưu vị trí gốc của server vào instance ngựa
+        this.horse.baseServerY = playerInfo.y;
 
         this.horse.setDepth(DEPTH.HORSE);
 
@@ -54,16 +77,25 @@ export default class PlayerManager {
         if (!playerInfo) return;
         if (playerInfo.id === myId) return;
 
+        const visualY = this.getVisualY(playerInfo.y);
+
         const existing = this.otherPlayers.getChildren().find(p => p.playerId === playerInfo.id);
         if (existing) {
             existing.serverIndex = playerInfo.serverIndex;
+            // [FIX] Cập nhật baseServerY
+            existing.baseServerY = playerInfo.y;
+
+            if (Math.abs(existing.y - visualY) > 1) {
+                existing.y = visualY;
+                existing.setDepth(visualY);
+            }
             return;
         }
 
         const other = new Horse(
             this.scene,
             playerInfo.x,
-            playerInfo.y,
+            visualY,
             'horse',
             playerInfo.id,
             playerInfo.horseColor,
@@ -71,20 +103,16 @@ export default class PlayerManager {
             false
         );
 
+        // [FIX] Lưu vị trí gốc của server
+        other.baseServerY = playerInfo.y;
         other.serverIndex = playerInfo.serverIndex;
-        other.setDepth(DEPTH.HORSE);
+        other.setDepth(visualY);
+
         if (other.playIdle) other.playIdle();
         else other.play('horse_idle');
+
         this.otherPlayers.add(other);
     }
-
-    // updateOtherPosition(playerInfo) {
-    //     const other = this.otherPlayers.getChildren().find(p => p.playerId === playerInfo.id);
-    //     if (!other) return;
-
-    //     other.setPosition(playerInfo.x, playerInfo.y);
-    //     if (other.playRun) other.playRun();
-    // }
 
     updateAllPositions(networkManager) {
         const state = networkManager.getInterpolatedState();
@@ -98,6 +126,8 @@ export default class PlayerManager {
 
         this.otherPlayers.getChildren().forEach(horse => {
             const idx = horse.serverIndex;
+            // Lưu ý: Server chỉ gửi X cập nhật liên tục, còn Y thường cố định.
+            // Tuy nhiên, nếu server gửi cả Y (trong snapshot), ta vẫn phải convert qua VisualY
             const x0 = b0.p[idx];
             const x1 = b1.p[idx];
 
@@ -109,7 +139,16 @@ export default class PlayerManager {
                     else if (horse.playRun) horse.playRun();
                 }
             }
+
+            // Đảm bảo Y luôn đúng (đề phòng resize trình duyệt giữa chừng)
+            // Lấy lại Y gốc từ server data (hoặc giữ nguyên Y hiện tại nếu server không gửi Y trong tick)
+            // Ở đây ta giả định Y không đổi trong race, nhưng cần update VisualOffset nếu Host resize
+            // Cách đơn giản nhất: Lấy Y hiện tại trừ offset cũ cộng offset mới...
+            // NHƯNG: Để đơn giản, ta chỉ cần set lại Y đúng trong addSelf/addOther hoặc khi resize.
+            // Nếu bạn muốn realtime resize:
+            // horse.y = this.getVisualY(ORIGINAL_SERVER_Y); -> Cần lưu serverY gốc vào object horse
         });
+
         if (this.state.role === 'host' && this.horse) {
             const idx = this.horse.serverIndex;
             const x0 = b0.p[idx];
@@ -120,21 +159,46 @@ export default class PlayerManager {
         }
     }
 
+    refreshHorseYPositions() {
+        // 1. Cập nhật ngựa của mình
+        if (this.horse && this.horse.baseServerY !== undefined) {
+            const newY = this.getVisualY(this.horse.baseServerY);
+            this.horse.y = newY;
+            this.horse.setDepth(newY);
+        }
+
+        // 2. Cập nhật ngựa người khác
+        this.otherPlayers.getChildren().forEach(horse => {
+            if (horse.baseServerY !== undefined) {
+                const newY = this.getVisualY(horse.baseServerY);
+                horse.y = newY;
+                horse.setDepth(newY);
+            }
+        });
+    }
+
     removeOther(playerId) {
         const p = this.otherPlayers.getChildren().find(x => x.playerId === playerId);
         if (p) p.destroy();
     }
 
     resetPositionsFromServer(players, myId) {
-        // host có thể không có entry trong players => check kỹ
         if (this.horse && players[myId]) {
             this.horse.x = players[myId].x;
+            const visualY = this.getVisualY(players[myId].y);
+            this.horse.y = visualY;
+            this.horse.setDepth(visualY);
+
             if (this.horse.resetColor) this.horse.resetColor();
         }
 
         this.otherPlayers.getChildren().forEach(p => {
             const info = players[p.playerId];
-            if (info) p.setPosition(info.x, info.y);
+            if (info) {
+                const visualY = this.getVisualY(info.y);
+                p.setPosition(info.x, visualY);
+                p.setDepth(visualY);
+            }
         });
     }
 

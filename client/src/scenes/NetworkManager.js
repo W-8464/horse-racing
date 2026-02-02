@@ -70,6 +70,12 @@ export default class NetworkManager {
             this.players.removeOther(playerId);
         });
 
+        this.socket.on('firstFinished', () => {
+            if (this.scene.fireworks) {
+                this.scene.fireworks.start();
+            }
+        });
+
         this.socket.on('raceReset', (players) => {
             if (!this.scene.state.sounds.bgm.isPlaying) {
                 this.scene.state.sounds.bgm.play();
@@ -82,6 +88,10 @@ export default class NetworkManager {
 
             this.scene.state.finishedPlayers = [];
 
+            if (this.scene.fireworks) {
+                this.scene.fireworks.stop();
+            }
+
             this.players.resetPositionsFromServer(players, this.socket.id);
 
             // UI theo role
@@ -90,7 +100,10 @@ export default class NetworkManager {
             this.ui.destroyWaitingText();
             this.ui.destroyPodium();
 
-            if (this.state.role === 'host') this.ui.showStartButton(() => this.hostStartGame());
+            if (this.state.role === 'host') {
+                this.ui.showStartButton(() => this.hostStartGame());
+                this.ui.showHostLeaderboard();
+            }
             if (this.state.role === 'player') this.ui.showWaitingText();
         });
 

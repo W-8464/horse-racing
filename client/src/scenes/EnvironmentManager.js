@@ -1,4 +1,3 @@
-// EnvironmentManager.js
 import { DEPTH, GAME_SETTINGS } from '../config/config.js';
 
 export default class EnvironmentManager {
@@ -6,7 +5,10 @@ export default class EnvironmentManager {
         this.scene = scene;
         this.worldWidth = GAME_SETTINGS.WORLD_WIDTH;
         this.baseHeight = GAME_SETTINGS.DESIGN_HEIGHT;
-        this.skyHeight = 110;
+
+        this.baseSkyHeight = 110;
+        this.skyHeight = this.baseSkyHeight;
+
         this.worldHeight = this.baseHeight;
 
         this.grass = null;
@@ -14,6 +16,8 @@ export default class EnvironmentManager {
         this.laneLines = null;
         this.sky = null;
         this.mist = null;
+        this.mountains = null;
+
         this._cloudsCreated = false;
         this._lanternsCreated = false;
         this._checkLineXs = [];
@@ -72,19 +76,24 @@ export default class EnvironmentManager {
         const worldHeight = Math.max(this.baseHeight, initialWorldHeight || this.baseHeight);
         this.worldHeight = worldHeight;
 
+        const extraHeight = Math.max(0, this.worldHeight - this.baseHeight);
+        this.skyHeight = this.baseSkyHeight + (extraHeight * 0.5);
+
         this.scene.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
         this.scene.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
 
+        // Sky
         if (!this.sky) {
-            const sky = this.scene.add.graphics();
-            sky.fillGradientStyle(0x87CEEB, 0x87CEEB, 0xbfe9ff, 0xbfe9ff, 1);
-            sky.fillRect(0, 0, this.worldWidth, this.skyHeight);
-            this.sky = sky;
+            this.sky = this.scene.add.graphics();
+            this.sky.fillGradientStyle(0x87CEEB, 0x87CEEB, 0xbfe9ff, 0xbfe9ff, 1);
+            this.sky.fillRect(0, 0, this.worldWidth, this.skyHeight);
         }
 
+        // Clouds
         if (!this._cloudsCreated) {
             for (let i = 0; i < this.worldWidth; i += 300) {
-                this.scene.add.image(i, 20 + Math.random() * 40, 'cloudPixel')
+                const cloudY = 20 + Math.random() * 40 + (extraHeight * 0.2);
+                this.scene.add.image(i, cloudY, 'cloudPixel')
                     .setScale(1.5 + Math.random())
                     .setAlpha(0.5)
                     .setScrollFactor(0.15);
@@ -92,6 +101,7 @@ export default class EnvironmentManager {
             this._cloudsCreated = true;
         }
 
+        // Grass
         if (!this.grass) {
             this.grass = this.scene.add.tileSprite(
                 0, this.skyHeight, this.worldWidth, this.worldHeight - this.skyHeight, 'grassPixel'
@@ -100,8 +110,17 @@ export default class EnvironmentManager {
             this._resizeGrass();
         }
 
+        // Mountains & Mist
+        if (!this.mist) {
+            this.drawMountains(this.worldWidth, this.skyHeight);
+            // Mist vẽ ở đây với depth là DEPTH.GRASS + 0.1
+            this.mist = this.drawHorizonMist(this.worldWidth);
+        }
+
+        // Track
         this._setupTrack();
 
+        // Lanterns
         if (!this._lanternsCreated) {
             for (let x = 0; x < this.worldWidth; x += 350) {
                 this.scene.add.image(x, -20, 'lantern')
@@ -109,24 +128,26 @@ export default class EnvironmentManager {
             }
             this._lanternsCreated = true;
         }
-
-        if (!this.mist) {
-            this.drawMountains(this.worldWidth, this.skyHeight);
-            this.mist = this.drawHorizonMist(this.worldWidth);
-        }
     }
 
     _setupTrack() {
         const TOP_MARGIN = 20;
         const LANE_HEIGHT = 40;
         const MAX_LANES = 7;
+
         const trackStartY = this.skyHeight + TOP_MARGIN;
         const trackHeight = LANE_HEIGHT * MAX_LANES;
 
         if (!this.track) {
             this.track = this.scene.add.tileSprite(
                 0, trackStartY, this.worldWidth, trackHeight, 'dirtPixel'
-            ).setOrigin(0, 0).setDepth(DEPTH.GRASS);
+            ).setOrigin(0, 0);
+
+            // [FIX LỖI MIST]: Đặt Depth của Track cao hơn Mist (Mist là GRASS + 0.1)
+            // Để Track luôn đè lên sương mù, sương mù chỉ hiện ở khe hở 20px (TOP_MARGIN)
+            this.track.setDepth(DEPTH.GRASS + 1);
+        } else {
+            this.track.y = trackStartY;
         }
 
         if (this.laneLines) {
@@ -134,7 +155,8 @@ export default class EnvironmentManager {
         }
 
         this.laneLines = this.scene.add.graphics();
-        this.laneLines.setDepth(DEPTH.GRASS);
+        // Lane Lines cũng phải cao hơn Track
+        this.laneLines.setDepth(DEPTH.GRASS + 2);
 
         this.laneLines.lineStyle(4, 0x5c4033, 1);
         this.laneLines.lineBetween(0, trackStartY, this.worldWidth, trackStartY);
@@ -152,25 +174,54 @@ export default class EnvironmentManager {
         if (newHeight === this.worldHeight) return;
 
         this.worldHeight = newHeight;
+
+        const extraHeight = Math.max(0, this.worldHeight - this.baseHeight);
+        const oldSkyHeight = this.skyHeight;
+        this.skyHeight = this.baseSkyHeight + (extraHeight * 0.5);
+
+        const deltaY = this.skyHeight - oldSkyHeight;
+
         this.scene.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
         this.scene.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
 
+        if (this.sky) {
+            this.sky.clear();
+            this.sky.fillGradientStyle(0x87CEEB, 0x87CEEB, 0xbfe9ff, 0xbfe9ff, 1);
+            this.sky.fillRect(0, 0, this.worldWidth, this.skyHeight);
+        }
+
         this._resizeGrass();
-        if (this.track) this.track.width = this.worldWidth;
+
+        if (this.track) {
+            this.track.width = this.worldWidth;
+            this._setupTrack();
+        }
+
+        if (this.mountains) {
+            this.mountains.y += deltaY;
+        }
+
+        if (this.mist) {
+            this.mist.clear();
+            this.mist.fillGradientStyle(0x87CEEB, 0x87CEEB, 0x73bd4d, 0x73bd4d, 0.8, 0.8, 0, 0);
+            this.mist.fillRect(0, this.skyHeight, this.worldWidth, 36);
+        }
+
         this._redrawCheckLines();
     }
 
     _resizeGrass() {
         if (!this.grass) return;
+        this.grass.y = this.skyHeight;
         const h = this.worldHeight - this.skyHeight;
         this.grass.setSize(this.worldWidth, h);
         this.grass.setDisplaySize(this.worldWidth, h);
     }
 
     drawMountains(worldWidth, mountainBaseY) {
-        const graphics = this.scene.add.graphics();
+        this.mountains = this.scene.add.graphics();
         const pixelSize = 6;
-        graphics.fillStyle(0x5a7e91, 0.6);
+        this.mountains.fillStyle(0x5a7e91, 0.6);
 
         for (let x = 0; x < worldWidth; x += 140) {
             const mHeight = 30 + Math.random() * 40;
@@ -181,16 +232,17 @@ export default class EnvironmentManager {
                 const drawX = Math.floor(startX / pixelSize) * pixelSize;
                 const drawY = mountainBaseY - py - pixelSize;
                 const drawW = Math.floor(currentWidth / pixelSize) * pixelSize;
-                if (drawW > 0) graphics.fillRect(drawX, drawY, drawW, pixelSize);
+                if (drawW > 0) this.mountains.fillRect(drawX, drawY, drawW, pixelSize);
             }
         }
-        graphics.setScrollFactor(0.25).setDepth(DEPTH.GRASS - 1);
+        this.mountains.setScrollFactor(0.25).setDepth(DEPTH.GRASS - 1);
     }
 
     drawHorizonMist(worldWidth) {
         const mist = this.scene.add.graphics();
         mist.fillGradientStyle(0x87CEEB, 0x87CEEB, 0x73bd4d, 0x73bd4d, 0.8, 0.8, 0, 0);
-        mist.fillRect(0, this.skyHeight, worldWidth, 80);
+        mist.fillRect(0, this.skyHeight, worldWidth, 36);
+        // Mist giữ nguyên depth thấp
         mist.setDepth(DEPTH.GRASS + 0.1).setScrollFactor(1);
         return mist;
     }
@@ -204,46 +256,29 @@ export default class EnvironmentManager {
 
     _createCheckeredLineGraphics(xPosition) {
         const graphics = this.scene.add.graphics();
-
-        // 1. Xác định phạm vi vẽ (Chỉ trong Lane)
         const TOP_MARGIN = 20;
         const LANE_HEIGHT = 40;
         const MAX_LANES = 7;
-
-        // Điểm bắt đầu và kết thúc của đường đua
         const startY = this.skyHeight + TOP_MARGIN;
         const endY = startY + (LANE_HEIGHT * MAX_LANES);
-
-        // 2. Cấu hình ô
         const topWidth = 24;
-        const bottomWidth = 36; // Loe nhẹ
-        // Quan trọng: Số hàng = Số làn x 2 (mỗi làn 2 ô checker) để nhìn khớp
+        const bottomWidth = 36;
         const rows = MAX_LANES * 2;
-
         const totalHeight = endY - startY;
         const rowHeight = totalHeight / rows;
 
         for (let i = 0; i < rows; i++) {
             const y1 = startY + i * rowHeight;
             const y2 = startY + (i + 1) * rowHeight;
-
             const progress1 = i / rows;
             const progress2 = (i + 1) / rows;
-
             const w1 = Phaser.Math.Linear(topWidth, bottomWidth, progress1) / 2;
             const w2 = Phaser.Math.Linear(topWidth, bottomWidth, progress2) / 2;
-
             for (let col = 0; col < 2; col++) {
                 const isWhite = (i + col) % 2 === 0;
-
-                if (isWhite) {
-                    graphics.fillStyle(0xffffff, 0.9);
-                } else {
-                    graphics.fillStyle(0x000000, 0.35);
-                }
-
+                if (isWhite) graphics.fillStyle(0xffffff, 0.9);
+                else graphics.fillStyle(0x000000, 0.35);
                 let p1, p2, p3, p4;
-
                 if (col === 0) {
                     p1 = { x: xPosition - w1, y: y1 };
                     p2 = { x: xPosition, y: y1 };
@@ -255,11 +290,9 @@ export default class EnvironmentManager {
                     p3 = { x: xPosition + w2, y: y2 };
                     p4 = { x: xPosition, y: y2 };
                 }
-
                 graphics.fillPoints([p1, p2, p3, p4], true);
             }
         }
-
         graphics.setDepth(DEPTH.CHECK_LINE);
         return graphics;
     }
