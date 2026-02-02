@@ -22,8 +22,14 @@ export default class PlayerManager {
     }
 
     addSelf(playerInfo) {
-        if (this.horse) return;
         if (!playerInfo) return;
+
+        if (this.horse) {
+            this.horse.y = playerInfo.y;
+            this.horse.serverIndex = playerInfo.serverIndex;
+            this.horse.setDepth(playerInfo.y);
+            return;
+        }
 
         this.horse = new Horse(
             this.scene,
@@ -37,8 +43,10 @@ export default class PlayerManager {
         );
 
         this.horse.setDepth(DEPTH.HORSE);
+
         if (this.horse.playIdle) this.horse.playIdle();
         else this.horse.play('horse_idle');
+
         this.scene.cameras.main.startFollow(this.horse, true, 0.1, 0.1);
     }
 

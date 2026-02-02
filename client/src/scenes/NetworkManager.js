@@ -88,6 +88,7 @@ export default class NetworkManager {
             this.ui.destroyWinner();
             this.ui.destroyStartButton();
             this.ui.destroyWaitingText();
+            this.ui.destroyPodium();
 
             if (this.state.role === 'host') this.ui.showStartButton(() => this.hostStartGame());
             if (this.state.role === 'player') this.ui.showWaitingText();
@@ -150,6 +151,16 @@ export default class NetworkManager {
             if (this.state.role === 'host') {
                 this.ui.updateHostLeaderboard(data.top10, data.top10);
             }
+
+            // data.top10 chứa danh sách top 10
+            const top3 = data.top10.slice(0, 3);
+
+            // Gọi UI hiển thị
+            // Lưu ý truyền vào callback restart
+            this.ui.showPodium(top3, () => {
+                // Hành động khi host bấm nút Restart trên bục
+                socket.emit('hostRestartGame');
+            });
         });
 
         this.socket.on('gameStateUpdate', (data) => {

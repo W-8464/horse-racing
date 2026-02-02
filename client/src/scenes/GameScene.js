@@ -213,26 +213,28 @@ export default class GameScene extends Phaser.Scene {
     }
 
     showInitialUI() {
-        this.ui.showPlayerNameInput(
-            (name) => {
-                this.handleFullScreen();
-                this.state.role = 'player';
-                this.network.selectRolePlayer(name);
-                this.ui.showWaitingText();
-            },
-            () => {
-                this.handleFullScreen();
-                this.ui.showHostPasswordInput(
-                    (password) => {
-                        this.state.role = 'host';
-                        this.network.selectRoleHost(password);
-                    },
-                    () => {
-                        this.showInitialUI();
-                    }
-                );
-            }
-        );
+        const path = window.location.pathname;
+
+        if (path === '/host') {
+            this.handleFullScreen();
+            this.ui.showHostPasswordInput(
+                (password) => {
+                    this.state.role = 'host';
+                    this.network.selectRoleHost(password);
+                }
+            );
+        }
+        else {
+            this.ui.showPlayerNameInput(
+                (name) => {
+                    this.handleFullScreen();
+                    this.state.role = 'player';
+                    this.network.selectRolePlayer(name);
+                    this.ui.showWaitingText();
+                    this.ui.showGuideOverlay();
+                }
+            );
+        }
     }
 
     update(time) {
@@ -260,6 +262,28 @@ export default class GameScene extends Phaser.Scene {
                 }
             }
         }
+
+        if (this.players) {
+            // 1. Ngựa của mình
+            if (this.players.horse && this.players.horse.active) {
+                this.players.horse.setDepth(this.players.horse.y);
+                if (this.players.horse.nameText) {
+                    this.players.horse.nameText.setDepth(this.players.horse.y + 10000);
+                }
+            }
+            // 2. Ngựa người khác
+            if (this.players.otherPlayers) {
+                this.players.otherPlayers.children.iterate((child) => {
+                    if (child && child.active) {
+                        child.setDepth(child.y);
+                        if (child.nameText) {
+                            child.nameText.setDepth(child.y + 10000);
+                        }
+                    }
+                });
+            }
+        }
+
         this.players?.updateHostCameraFollow();
     }
 }

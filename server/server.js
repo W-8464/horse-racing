@@ -10,6 +10,10 @@ const path = require('path');
 
 app.use(express.static(path.join(__dirname, '../client')));
 
+app.get('/host', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/index.html'));
+});
+
 const players = {};
 const HOST_PASSWORD = 'a';
 let gameState = {
@@ -65,8 +69,10 @@ io.on('connection', (socket) => {
         }
 
         const horseColor = color || (Math.random() * 0xffffff);
-        const skyHeight = 110;
-        const padding = 30;
+        const SKY_HEIGHT = 110;
+        const TOP_MARGIN = 20;
+        const LANE_HEIGHT = 40;
+        const MAX_LANES = 7;
 
         let assignedIndex;
         if (availableIndexes.length > 0) {
@@ -76,10 +82,12 @@ io.on('connection', (socket) => {
         }
 
         playerIndexMap.set(socket.id, assignedIndex);
+        const laneIndex = assignedIndex % MAX_LANES;
+        const overlapOffset = (assignedIndex >= MAX_LANES) ? (Math.random() * 10 - 5) : 0;
 
         players[socket.id] = {
             x: 100,
-            y: skyHeight + padding + ((Object.keys(players).length % 6) * 45),
+            y: SKY_HEIGHT + TOP_MARGIN + (laneIndex * LANE_HEIGHT) + overlapOffset,
             id: socket.id,
             serverIndex: assignedIndex,
             name,
@@ -121,7 +129,8 @@ io.on('connection', (socket) => {
             finishedPlayers.push({
                 id: socket.id,
                 name: player.name,
-                finishTime: finishTime
+                finishTime: finishTime,
+                horseColor: player.horseColor
             });
 
             socket.emit('youFinished', { rank: finishedPlayers.length });
@@ -135,7 +144,8 @@ io.on('connection', (socket) => {
                     id: p.id,
                     rank: index + 1,
                     name: p.name,
-                    finishTime: p.finishTime
+                    finishTime: p.finishTime,
+                    horseColor: p.horseColor
                 }));
 
                 io.emit('raceFinished', {
