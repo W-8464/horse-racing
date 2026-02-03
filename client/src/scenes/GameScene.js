@@ -78,6 +78,8 @@ export default class GameScene extends Phaser.Scene {
     }
 
     create() {
+        this.input.addPointer(3);
+
         // environment
         this.env = new EnvironmentManager(this);
         this.env.createPixelTextures();
