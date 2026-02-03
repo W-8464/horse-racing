@@ -119,6 +119,22 @@ export default class GameScene extends Phaser.Scene {
         this.setupRestartHandler();
 
         this.showInitialUI();
+
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
+    }
+
+    shutdown() {
+        // Dọn dẹp socket listeners để tránh memory leak và lỗi logic
+        if (this.network && this.network.socket) {
+            this.network.socket.off('gameStateUpdate');
+            this.network.socket.off('playerMoved');
+            this.network.socket.off('raceFinished');
+            this.network.socket.off('raceReset');
+            this.network.socket.off('startCountdown');
+            this.network.socket.off('newPlayer');
+            this.network.socket.off('currentPlayers');
+            // Tắt các sự kiện khác nếu cần...
+        }
     }
 
     setupResizeHandler() {
@@ -283,15 +299,17 @@ export default class GameScene extends Phaser.Scene {
                     const percent = distanceCovered / distanceTotal;
 
                     // Gọi UI để update
-                    this.ui.updateProgressBar(percent);
+                    if (this.ui) this.ui.updateProgressBar(percent);
                 }
             }
         }
 
-        if (this.players) {
+        if (this.players && this.players.updateDepths) {
             this.players.updateDepths();
         }
 
-        this.players?.updateHostCameraFollow();
+        if (this.players && this.players.updateHostCameraFollow) {
+            this.players.updateHostCameraFollow();
+        }
     }
 }

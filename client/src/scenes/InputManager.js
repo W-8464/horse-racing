@@ -19,7 +19,7 @@ export default class InputManager {
 
         if (!this.state.isRaceStarted || this.state.isFinished || !this.players.horse) return;
 
-        this.players.moveSelfBy(10);
+        this.players.moveSelfBy(15);
         this.network.emitMovement(this.players.horse.x);
 
         if (this.players.horse.requestRun) this.players.horse.requestRun(1);

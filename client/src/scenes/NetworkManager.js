@@ -77,6 +77,8 @@ export default class NetworkManager {
         });
 
         this.socket.on('raceReset', (players) => {
+            if (!this.scene || !this.scene.sys || !this.scene.sys.settings.active) return;
+
             if (this.scene.state.sounds.gallop && this.scene.state.sounds.gallop.isPlaying) {
                 this.scene.state.sounds.gallop.stop();
             }
@@ -156,6 +158,8 @@ export default class NetworkManager {
         });
 
         this.socket.on('raceFinished', (data) => {
+            if (!this.scene || !this.scene.sys || !this.scene.sys.settings.active) return;
+
             this.scene.state.finishedPlayers = data.top10;
             this.state.isRaceStarted = false;
             this.state.isFinished = true;
@@ -174,6 +178,8 @@ export default class NetworkManager {
         });
 
         this.socket.on('gameStateUpdate', (data) => {
+            if (!this.scene || !this.scene.sys || !this.scene.sys.settings.active) return;
+
             let rawBuffer = data.b;
 
             if (!(rawBuffer instanceof ArrayBuffer) && rawBuffer.buffer) {
