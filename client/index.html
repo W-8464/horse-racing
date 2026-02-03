@@ -19,11 +19,15 @@
 
     <style>
         * {
+            /* Tắt menu hệ thống khi nhấn giữ */
+            -webkit-touch-callout: none !important;
+
+            /* Tắt khả năng bôi đen văn bản */
             -webkit-user-select: none !important;
             user-select: none !important;
-            -webkit-touch-callout: none !important;
-            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-            touch-action: none;
+
+            /* Tắt highlight màu khi tap */
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
         }
 
         /* 4. CSS để khóa màn hình tuyệt đối */
@@ -119,36 +123,48 @@
     <div id="game-container"></div>
     <div id="version-tag">v2.6</div>
     <script>
-        // Hàm ngăn chặn hành vi mặc định (zoom, scroll, menu hệ thống)
-        function preventBehavior(e) {
+        // --- KHAI BÁO BIẾN Ở ĐẦU ---
+        let lastTouchEnd = 0;
+        const gameContainer = document.getElementById('game-container');
+
+        // 1. Hàm chặn mặc định chung
+        function preventDefault(e) {
             e.preventDefault();
         }
 
-        // Lấy container game hoặc body
-        const gameContainer = document.getElementById('game-container');
+        // 2. CHẶN GESTURE CỦA IOS (Phần quan trọng nhất)
+        document.addEventListener('gesturestart', preventDefault, { passive: false });
+        document.addEventListener('gesturechange', preventDefault, { passive: false });
+        document.addEventListener('gestureend', preventDefault, { passive: false });
 
-        // 1. Chặn Double Tap Zoom và các hành vi touch mặc định
-        // Quan trọng: Phải set { passive: false } thì preventDefault mới có tác dụng trên trình duyệt hiện đại
-        document.addEventListener('touchmove', preventBehavior, { passive: false });
+        // 3. Chặn menu chuột phải
+        document.addEventListener('contextmenu', preventDefault);
 
-        // 2. Chặn sự kiện Double Tap gây ra zoom/scroll ảo
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', function (event) {
+        // 4. Chặn Touch Move
+        document.addEventListener('touchmove', preventDefault, { passive: false });
+
+        // 5. Xử lý Touchend & Double Tap
+        document.addEventListener('touchend', function (e) {
+            // Xóa vùng chọn văn bản ngay lập tức
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                selection.removeAllRanges();
+            }
+
+            // Chặn Double-tap Zoom
             const now = (new Date()).getTime();
             if (now - lastTouchEnd <= 300) {
-                event.preventDefault();
+                e.preventDefault();
             }
             lastTouchEnd = now;
+
+            // Hack focus để iOS không hiện bàn phím ảo hay thanh công cụ
+            if (document.activeElement &&
+                document.activeElement !== document.body &&
+                document.activeElement.tagName !== 'CANVAS') {
+                document.activeElement.blur();
+            }
         }, { passive: false });
-
-        // 3. Chặn menu chuột phải/long press (cho chắc chắn, dù CSS đã có)
-        document.addEventListener('contextmenu', event => event.preventDefault());
-
-        // 4. Hack fix cho iOS: Đôi khi iOS coi game là input text, gây ra lỗi Undo
-        // Ta focus vào window hoặc canvas để đảm bảo không focus vào input ẩn nào đó
-        document.addEventListener('click', function (e) {
-            window.focus();
-        });
     </script>
     <script type="module" src="src/main.js"></script>
 </body>
