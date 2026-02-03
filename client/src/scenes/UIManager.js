@@ -79,6 +79,10 @@ export default class UIManager {
         this.helpBtn = null;
         this.hostLeaderboardDom = null;
 
+        this.progressBarContainer = null;
+        this.progressBarFill = null;
+        this.progressText = null;
+
         this._ratioInputY = 0.45;
         this._ratioCountdownY = 0.35;
     }
@@ -157,6 +161,12 @@ export default class UIManager {
         if (this.finishRankText) {
             this.finishRankText.setPosition(cx, cy - 100 * clampedScale);
             this.finishRankText.setScale(clampedScale);
+        }
+
+        if (this.progressBarContainer) {
+            // Đặt ở vị trí 90% chiều cao màn hình
+            this.progressBarContainer.setPosition(cx, h * 0.9);
+            this.progressBarContainer.setScale(clampedScale);
         }
     }
 
@@ -311,7 +321,8 @@ export default class UIManager {
         this.destroyWinner();
         this.destroyGuideOverlay();
         this.destroyHelpButton();
-        this.destroyPodium(); // Đảm bảo destroy podium cũ nếu có
+        this.destroyPodium();
+        this.updateProgressBar(0);
     }
 
     startCountdown() {
@@ -385,6 +396,10 @@ export default class UIManager {
                     this.scene.events.emit('restartRequested');
                 }
             });
+        }
+
+        if (role === 'player') {
+            this.showProgressBar();
         }
 
         this.layout();
@@ -635,6 +650,65 @@ export default class UIManager {
             this.helpBtn.setVisible(true);
         } else {
             this.showHelpButton();
+        }
+    }
+
+    showProgressBar() {
+        if (this.progressBarContainer) return;
+
+        const width = 400; // Chiều rộng thanh
+        const height = 20; // Chiều cao thanh
+        const borderColor = 0x5dfc9b; // Màu xanh neon (giống theme)
+        const bgColor = 0x003b1f;     // Màu xanh đậm
+        const fillColor = 0xffeb3b;   // Màu vàng (nổi bật)
+
+        this.progressBarContainer = this.scene.add.container(0, 0).setDepth(DEPTH.UI).setScrollFactor(0);
+
+        // 1. Vẽ khung nền
+        const bg = this.scene.add.graphics();
+        bg.fillStyle(bgColor, 1);
+        bg.lineStyle(2, borderColor, 1);
+        bg.fillRoundedRect(-width / 2, -height / 2, width, height, 10);
+        bg.strokeRoundedRect(-width / 2, -height / 2, width, height, 10);
+
+        // 2. Vẽ thanh fill (Ban đầu width = 0)
+        this.progressBarFill = this.scene.add.graphics();
+        // Lưu reference width/height để dùng lúc update
+        this.progressBarFill.defaultWidth = width - 4; // Trừ viền
+        this.progressBarFill.defaultHeight = height - 4;
+        this.progressBarFill.defaultX = -width / 2 + 2;
+        this.progressBarFill.defaultY = -height / 2 + 2;
+
+        // Vẽ trạng thái ban đầu (rỗng)
+        this.updateProgressBar(0);
+
+        this.progressBarContainer.add([bg, this.progressBarFill]);
+
+        this.layout();
+    }
+
+    // [THÊM MỚI] Hàm cập nhật giá trị (0.0 -> 1.0)
+    updateProgressBar(percent) {
+        if (!this.progressBarContainer || !this.progressBarFill) return;
+
+        // Clamp giá trị từ 0 đến 1
+        const p = Phaser.Math.Clamp(percent, 0, 1);
+
+        this.progressBarFill.clear();
+        this.progressBarFill.fillStyle(0xffeb3b, 1); // Màu vàng
+
+        // Tính chiều rộng dựa trên %
+        const currentW = this.progressBarFill.defaultWidth * p;
+
+        // Vẽ hình chữ nhật bo góc
+        if (currentW > 0) {
+            this.progressBarFill.fillRoundedRect(
+                this.progressBarFill.defaultX,
+                this.progressBarFill.defaultY,
+                currentW,
+                this.progressBarFill.defaultHeight,
+                4
+            );
         }
     }
 }

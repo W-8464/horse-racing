@@ -8,6 +8,9 @@ import FlashSkillManager from './FlashSkillManager.js';
 import InputManager from './InputManager.js';
 import FireworksManager from './FireworksManager.js';
 
+const MAP_START_X = 100;
+const MAP_FINISH_X = 5400;
+
 export default class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
@@ -267,6 +270,20 @@ export default class GameScene extends Phaser.Scene {
 
                     this.lastLeaderboardUpdate = time;
                 }
+            }
+
+            if (this.state.role === 'player' && this.players.horse) {
+                const myHorse = this.players.horse;
+
+                // Tính quãng đường đi được
+                const distanceTotal = MAP_FINISH_X - MAP_START_X;
+                const distanceCovered = myHorse.x - MAP_START_X;
+
+                // Tính phần trăm (0.0 -> 1.0)
+                const percent = distanceCovered / distanceTotal;
+
+                // Gọi UI để update
+                this.ui.updateProgressBar(percent);
             }
         }
 

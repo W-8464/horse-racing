@@ -4,7 +4,7 @@ export default class InputManager {
         this.state = state;
         this.players = players;
         this.network = network;
-        this.flashSkill = flashSkill;
+        //this.flashSkill = flashSkill;
         this.ui = ui;
     }
 
@@ -23,7 +23,7 @@ export default class InputManager {
         if (!this.state.isRaceStarted || this.state.isFinished || !this.players.horse) return;
 
         // click vào flash button thì bỏ qua click chạy
-        if (this.flashSkill.isPointerOnButton(pointer)) return;
+        //if (this.flashSkill.isPointerOnButton(pointer)) return;
 
         this.players.moveSelfBy(10);
         this.network.emitMovement(this.players.horse.x);
@@ -31,6 +31,6 @@ export default class InputManager {
         if (this.players.horse.requestRun) this.players.horse.requestRun(1);
         else if (this.players.horse.playRun) this.players.horse.playRun();
 
-        this.flashSkill.registerNormalClick();
+        //this.flashSkill.registerNormalClick();
     }
 }
