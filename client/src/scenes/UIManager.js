@@ -322,12 +322,29 @@ export default class UIManager {
         this.destroyHelpButton();
         this.destroyPodium();
         this.updateProgressBar(0);
+
+        if (this.countdownTimer) {
+            this.scene.time.removeEvent(this.countdownTimer);
+            this.countdownTimer = null;
+        }
+        if (this.countdownText) {
+            this.countdownText.destroy();
+            this.countdownText = null;
+        }
     }
 
     startCountdown() {
         this.state.isCountdownRunning = true;
         let timeLeft = GAME_SETTINGS.COUNTDOWN_TIME || 3;
 
+        // [FIX 1] Hủy Timer cũ nếu nó đang chạy
+        // Nếu không hủy, timer cũ sẽ cố update text cũ -> Lỗi glTexture
+        if (this.countdownTimer) {
+            this.scene.time.removeEvent(this.countdownTimer);
+            this.countdownTimer = null;
+        }
+
+        // [FIX 2] Hủy Text cũ
         if (this.countdownText) {
             this.countdownText.destroy();
             this.countdownText = null;
@@ -342,23 +359,33 @@ export default class UIManager {
             strokeThickness: 8
         })
             .setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH.OVERLAY);
+
         this.countdownText = txt;
         this.layout();
 
-        this.scene.time.addEvent({
+        // [FIX 3] Gán Timer vào biến this.countdownTimer để quản lý
+        this.countdownTimer = this.scene.time.addEvent({
             delay: 1000,
             repeat: timeLeft,
             callback: () => {
+                // [FIX 4] Kiểm tra sống còn: Nếu Text đã bị destroy thì DỪNG NGAY
+                if (!this.countdownText || !this.countdownText.scene) {
+                    return;
+                }
+
                 timeLeft--;
                 if (timeLeft > 0) {
                     txt.setText(timeLeft.toString());
                     return;
                 }
+
                 txt.setText('GO!');
                 this.state.isRaceStarted = true;
                 this.state.isCountdownRunning = false;
+
                 this.scene.time.delayedCall(800, () => {
-                    if (this.countdownText) {
+                    // Kiểm tra lại lần nữa trước khi destroy
+                    if (this.countdownText && this.countdownText.scene) {
                         this.countdownText.destroy();
                         this.countdownText = null;
                     }
