@@ -26,8 +26,8 @@
             -webkit-user-select: none !important;
             user-select: none !important;
 
-            /* Tắt highlight màu khi tap */
-            -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
+            -webkit-user-drag: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         *:not(input) {
@@ -140,6 +140,18 @@
         function preventDefault(e) {
             if (e.cancelable) e.preventDefault();
         }
+
+        document.addEventListener('touchstart', function (e) {
+            // Nếu chạm từ 2 ngón trở lên, chặn ngay lập tức tín hiệu truyền về iOS
+            if (e.touches.length > 1) {
+                if (e.cancelable) e.preventDefault();
+            }
+
+            // Nếu đang chơi game, chặn mọi hành vi mặc định của 1 ngón luôn (trừ khi là input)
+            if (!window.isInputActive && e.target.tagName !== 'INPUT') {
+                if (e.cancelable) e.preventDefault();
+            }
+        }, { passive: false });
 
         // 1. CHẶN BÔI ĐEN
         document.addEventListener('selectstart', function (e) {

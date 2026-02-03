@@ -12,12 +12,24 @@ export default class InputManager {
     }
 
     onPointerDown(pointer) {
-        // [FIX] Chỉ chặn nếu isPrimary KHẲNG ĐỊNH là false (ngón tay thứ 2 trở đi)
-        // Nếu là undefined (trên PC hoặc một số trình duyệt) thì vẫn cho qua.
-        if (pointer.isPrimary === false) return;
+        // [LOGIC MỚI] 
+        // Cho phép ngón 1 và ngón 2 (để người chơi tap luân phiên 2 ngón cái)
+        // Chỉ chặn từ ngón thứ 3 trở đi để tránh gesture của iOS.
+        // Trong Phaser, các pointer thường được tái sử dụng, nhưng ta có thể check số lượng active.
+
+        const activePointers = this.scene.input.manager.pointersTotal;
+        // Hoặc đơn giản hơn: kiểm tra index của pointer hiện tại (0 là primary, 1 là ngón 2)
+        if (pointer.index > 1) return;
+
+        // [Lưu ý] Dòng cũ của bạn là: if (pointer.isPrimary === false) return; 
+        // Dòng đó sẽ chặn luôn pointer.index === 1 (ngón thứ 2), làm mất khả năng đua tốc độ cao.
 
         if (this.ui.isWinnerOpen()) return;
         if (this.state.role !== 'player') return;
+
+        // Thêm check này để tránh tap lúc đang đếm ngược 3-2-1
+        if (this.state.isCountdownRunning) return;
+
         if (!this.state.isRaceStarted || this.state.isFinished || !this.players.horse) return;
 
         this.players.moveSelfBy(10);
