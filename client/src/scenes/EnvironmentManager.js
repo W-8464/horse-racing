@@ -222,7 +222,7 @@ export default class EnvironmentManager {
 
         const standHeight = 80;
         const stepHeight = 10;
-        const steps = 6;
+        const steps = 2;
 
         // Biến đếm để xác định nội dung chữ
         let sectionIndex = 0;
@@ -233,7 +233,7 @@ export default class EnvironmentManager {
             const boardW = sectionWidth - 40;
             const boardH = 50;
             const boardX = x + 20;
-            const boardY = startY - standHeight - boardH + 20;
+            const boardY = startY - standHeight - boardH + 50;
 
             const board = this.scene.add.graphics();
             // Chân biển
@@ -291,7 +291,7 @@ export default class EnvironmentManager {
                 stand.fillRect(x, currentY, sectionWidth, 2);
 
                 // Đặt Người (Khán giả)
-                const peopleCount = Math.floor(Math.random()) + 3;
+                const peopleCount = Math.floor(Math.random() * 8) + 3;
                 for (let p = 0; p < peopleCount; p++) {
                     const px = x + Math.random() * (sectionWidth - 20) + 10;
                     // Chỉnh toạ độ Y: +5 để chân người thấp hơn mép ghế một chút
