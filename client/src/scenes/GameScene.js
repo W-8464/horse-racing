@@ -221,29 +221,48 @@ export default class GameScene extends Phaser.Scene {
     }
 
     update(time) {
-        // [FIX] Đã bỏ dòng chặn màn hình dọc: if (window.innerHeight > window.innerWidth) return;
-
         if (this.players && this.network) {
             this.players.updateAllPositions(this.network);
 
+            // [LOGIC MỚI] Sửa lại phần update Leaderboard
             if (!this.state.isFinished) {
                 if (!this.lastLeaderboardUpdate || time - this.lastLeaderboardUpdate > 200) {
 
-                    // Gom tất cả ngựa (ngựa người khác + ngựa mình)
+                    // 1. Lấy danh sách những người đã về đích từ state (do Server gửi về)
+                    const finishedPlayers = this.state.finishedPlayers || [];
+
+                    // 2. Gom tất cả ngựa đang chạy
                     const allHorses = [...this.players.otherPlayers.getChildren()];
                     if (this.players.horse) allHorses.push(this.players.horse);
 
-                    const sortedData = allHorses.map(h => ({
-                        id: h.playerId,
-                        name: h.playerName || 'Guest',
-                        x: h.x,
-                        horseColor: h.baseColor
-                    }));
+                    // 3. Map dữ liệu để sắp xếp
+                    const sortedData = allHorses.map(h => {
+                        // Kiểm tra xem ngựa này đã nằm trong danh sách về đích chưa
+                        const finishRecord = finishedPlayers.find(f => f.id === h.playerId);
 
-                    // Sắp xếp theo vị trí X giảm dần (ai chạy xa hơn đứng trước)
-                    sortedData.sort((a, b) => b.x - a.x);
+                        return {
+                            id: h.playerId,
+                            name: h.playerName || 'Guest',
+                            x: h.x,
+                            horseColor: h.baseColor,
+                            // Nếu đã về đích thì lấy rank từ server, chưa thì là Infinity
+                            rank: finishRecord ? finishRecord.rank : Infinity,
+                            finishTime: finishRecord ? finishRecord.finishTime : null
+                        };
+                    });
 
-                    // Gọi hàm update UI mới
+                    // 4. Sắp xếp:
+                    // - Ưu tiên người có Rank (đã về đích) nhỏ hơn lên trước.
+                    // - Nếu cả 2 chưa về đích (Rank = Infinity), ai chạy xa hơn (x lớn hơn) đứng trước.
+                    sortedData.sort((a, b) => {
+                        if (a.rank !== b.rank) {
+                            return a.rank - b.rank; // 1, 2, 3... lên trước Infinity
+                        }
+                        // Cả 2 đều chưa về đích -> so sánh quãng đường X
+                        return b.x - a.x;
+                    });
+
+                    // 5. Gọi hàm update UI
                     this.ui.updateLeaderboard(sortedData);
 
                     this.lastLeaderboardUpdate = time;
@@ -251,7 +270,6 @@ export default class GameScene extends Phaser.Scene {
             }
         }
 
-        // [UPDATE] Gọi hàm updateDepths của PlayerManager để đồng bộ depth chính xác
         if (this.players) {
             this.players.updateDepths();
         }

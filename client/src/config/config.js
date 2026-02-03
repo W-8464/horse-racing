@@ -1,5 +1,3 @@
-// config.js
-
 export const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
@@ -18,6 +16,10 @@ export const config = {
         default: 'arcade',
         arcade: { debug: false }
     },
+    input: {
+        activePointers: 3, // Cho phép nhận diện tối đa 3 ngón tay cùng lúc
+    },
+    disableContextMenu: true,
 };
 
 export const GAME_SETTINGS = {

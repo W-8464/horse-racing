@@ -124,14 +124,19 @@ io.on('connection', (socket) => {
 
         if (data.x >= FINISH_LINE_X) {
             const finishTime = ((Date.now() - startTime) / 1000).toFixed(2);
-            finishedPlayers.push({
+            const result = {
                 id: socket.id,
                 name: player.name,
                 finishTime: finishTime,
-                horseColor: player.horseColor
-            });
+                horseColor: player.horseColor,
+                rank: finishedPlayers.length + 1 // Rank hiện tại = số người đã về + 1
+            };
 
-            socket.emit('youFinished', { rank: finishedPlayers.length });
+            finishedPlayers.push(result);
+
+            socket.emit('youFinished', { rank: result.rank });
+
+            io.emit('updateFinishedList', finishedPlayers);
 
             if (finishedPlayers.length === 1) {
                 io.emit('firstFinished');

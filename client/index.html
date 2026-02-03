@@ -59,10 +59,15 @@
         }
 
         canvas {
-            -webkit-touch-callout: none;
-            user-select: none;
-            outline: none;
-            -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
+            touch-action: none !important;
+            -ms-touch-action: none !important;
+            -webkit-touch-callout: none !important;
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+            user-select: none !important;
+            /* Loại bỏ highlight màu xanh khi tap trên Android/Zalo */
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
+            outline: none !important;
         }
 
         #version-tag {
@@ -113,6 +118,38 @@
 <body>
     <div id="game-container"></div>
     <div id="version-tag">v2.6</div>
+    <script>
+        // Hàm ngăn chặn hành vi mặc định (zoom, scroll, menu hệ thống)
+        function preventBehavior(e) {
+            e.preventDefault();
+        }
+
+        // Lấy container game hoặc body
+        const gameContainer = document.getElementById('game-container');
+
+        // 1. Chặn Double Tap Zoom và các hành vi touch mặc định
+        // Quan trọng: Phải set { passive: false } thì preventDefault mới có tác dụng trên trình duyệt hiện đại
+        document.addEventListener('touchmove', preventBehavior, { passive: false });
+
+        // 2. Chặn sự kiện Double Tap gây ra zoom/scroll ảo
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
+
+        // 3. Chặn menu chuột phải/long press (cho chắc chắn, dù CSS đã có)
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        // 4. Hack fix cho iOS: Đôi khi iOS coi game là input text, gây ra lỗi Undo
+        // Ta focus vào window hoặc canvas để đảm bảo không focus vào input ẩn nào đó
+        document.addEventListener('click', function (e) {
+            window.focus();
+        });
+    </script>
     <script type="module" src="src/main.js"></script>
 </body>
 

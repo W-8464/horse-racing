@@ -376,30 +376,34 @@ export default class UIManager {
         this.layout();
     }
 
-    // [SỬA TÊN HÀM CHO ĐỒNG BỘ]
     updateLeaderboard(sortedPlayers) {
         if (!this.hostLeaderboardDom) return;
 
         const listContainer = this.hostLeaderboardDom.getChildByID('leaderboard-list');
         if (!listContainer) return;
 
-        const finishedData = this.state.finishedPlayers || [];
         // Player màn hình nhỏ, có thể chỉ nên hiện Top 5 thay vì Top 10 nếu muốn gọn
         const topCount = 10;
         const topList = sortedPlayers.slice(0, topCount);
 
         listContainer.innerHTML = topList.map((player, index) => {
-            const finishEntry = finishedData.find(f => f.id === player.id);
-            const timeText = finishEntry ? `<span style="color:#ffeb3b; font-size:12px;">${finishEntry.finishTime}s</span>` : '';
+            // [LOGIC MỚI] Lấy time trực tiếp từ object đã map ở GameScene
+            const timeText = player.finishTime
+                ? `<span style="color:#ffeb3b; font-size:12px;">${player.finishTime}s</span>`
+                : '';
+
             const isFirst = index === 0;
-            // Highlight tên mình (nếu là player)
+            // Highlight tên mình
             const isMe = (player.id === this.scene.network?.socket?.id);
             const nameColor = isFirst ? '#ffeb3b' : (isMe ? '#ffffff' : '#5dfc9b');
             const rowStyle = isMe ? 'font-weight:bold; background:rgba(255,255,255,0.1);' : '';
 
+            // Rank hiển thị: Nếu đã về đích dùng rank thật, chưa về đích dùng index tạm thời
+            const displayRank = (player.rank !== Infinity) ? player.rank : (index + 1);
+
             return `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 14px; color: ${nameColor}; ${rowStyle}">
-                <span>#${index + 1} ${player.name.substring(0, 8)}</span>
+                <span>#${displayRank} ${player.name.substring(0, 8)}</span>
                 ${timeText}
             </div>
         `;

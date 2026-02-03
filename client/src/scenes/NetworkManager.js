@@ -143,6 +143,11 @@ export default class NetworkManager {
             });
         });
 
+        this.socket.on('updateFinishedList', (list) => {
+            this.scene.state.finishedPlayers = list;
+            this.scene.lastLeaderboardUpdate = 0;
+        });
+
         this.socket.on('youFinished', (data) => {
             this.ui.showLocalFinishRank(data.rank);
             this.scene.state.sounds.finish.play();
