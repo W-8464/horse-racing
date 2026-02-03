@@ -165,6 +165,8 @@ export default class UIManager {
     }
 
     showPlayerNameInput(onJoin) {
+        window.isInputActive = true;
+
         const { cx, cy } = this._getLayout();
         const textStyle = "color:#5dfc9b;font-family:monospace;font-size:32px;margin-bottom:10px; font-weight:bold; text-shadow: 2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000, 1px 1px #000, -1px -1px #000, 1px -1px #000, -1px 1px #000;";
         const dom = this.scene.add.dom(cx, cy).createFromHTML(`
@@ -192,13 +194,20 @@ export default class UIManager {
     }
 
     destroyPlayerNameInput() {
+        window.isInputActive = false;
+
         if (this.playerNameDom) {
             this.playerNameDom.destroy();
             this.playerNameDom = null;
         }
+
+        if (document.activeElement) document.activeElement.blur();
+        window.focus();
     }
 
     showHostPasswordInput(onConfirm) {
+        window.isInputActive = true;
+
         const { cx } = this._getLayout();
         const textStyle = "color:#ff1744;font-family:monospace;font-size:20px;margin-bottom:10px; font-weight:bold; text-shadow: 2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000, 1px 1px #000, -1px -1px #000, 1px -1px #000, -1px 1px #000;";
         const dom = this.scene.add.dom(cx, 300).createFromHTML(`
@@ -228,11 +237,16 @@ export default class UIManager {
     }
 
     destroyHostPasswordInput() {
+        window.isInputActive = false;
+
         if (this.hostPassDom) {
             this.hostPassDom.destroy();
             this.hostPassDom = null;
             window.scrollTo(0, 0);
         }
+
+        if (document.activeElement) document.activeElement.blur();
+        window.focus();
     }
 
     showWaitingText() {

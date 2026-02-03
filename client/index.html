@@ -30,6 +30,13 @@
             -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
         }
 
+        *:not(input) {
+            -webkit-user-select: none !important;
+            user-select: none !important;
+            -webkit-touch-callout: none !important;
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
+        }
+
         /* 4. CSS để khóa màn hình tuyệt đối */
         html,
         body {
@@ -123,48 +130,77 @@
     <div id="game-container"></div>
     <div id="version-tag">v2.6</div>
     <script>
-        // --- KHAI BÁO BIẾN Ở ĐẦU ---
-        let lastTouchEnd = 0;
-        const gameContainer = document.getElementById('game-container');
+        // --- BIẾN TOÀN CỤC: CỜ BẬT/TẮT CHẾ ĐỘ NHẬP LIỆU ---
+        // false: Đang chơi game (Chặn hết)
+        // true: Đang nhập tên/pass (Cho phép gõ)
+        window.isInputActive = false;
 
-        // 1. Hàm chặn mặc định chung
+        let lastTouchEnd = 0;
+
         function preventDefault(e) {
-            e.preventDefault();
+            if (e.cancelable) e.preventDefault();
         }
 
-        // 2. CHẶN GESTURE CỦA IOS (Phần quan trọng nhất)
+        // 1. CHẶN BÔI ĐEN
+        document.addEventListener('selectstart', function (e) {
+            // Nếu đang ở chế độ nhập liệu và target là input -> Cho phép
+            if (window.isInputActive && e.target.tagName === 'INPUT') return;
+            preventDefault(e);
+        });
+
+        document.addEventListener('selectionchange', function () {
+            // Nếu đang chơi game mà lại có selection -> Xóa ngay
+            if (!window.isInputActive) {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) selection.removeAllRanges();
+            }
+        });
+
+        // 2. CHẶN GESTURE (ZOOM, 3 NGÓN) - Luôn chặn để tránh zoom trang
         document.addEventListener('gesturestart', preventDefault, { passive: false });
         document.addEventListener('gesturechange', preventDefault, { passive: false });
         document.addEventListener('gestureend', preventDefault, { passive: false });
 
-        // 3. Chặn menu chuột phải
-        document.addEventListener('contextmenu', preventDefault);
+        // 3. CHẶN MENU CHUỘT PHẢI
+        document.addEventListener('contextmenu', function (e) {
+            if (window.isInputActive && e.target.tagName === 'INPUT') return;
+            preventDefault(e);
+        });
 
-        // 4. Chặn Touch Move
-        document.addEventListener('touchmove', preventDefault, { passive: false });
+        // 4. CHẶN KÉO TRANG (TOUCHMOVE)
+        document.addEventListener('touchmove', function (e) {
+            // Luôn chặn kéo trang để cố định màn hình game
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
 
-        // 5. Xử lý Touchend & Double Tap
+        // 5. XỬ LÝ DOUBLE TAP & TOUCH END
         document.addEventListener('touchend', function (e) {
-            // Xóa vùng chọn văn bản ngay lập tức
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) {
-                selection.removeAllRanges();
+            // Nếu đang nhập liệu thì không can thiệp (để người dùng tap vào ô input/nút bấm)
+            if (window.isInputActive) {
+                lastTouchEnd = (new Date()).getTime();
+                return;
             }
 
-            // Chặn Double-tap Zoom
             const now = (new Date()).getTime();
             if (now - lastTouchEnd <= 300) {
                 e.preventDefault();
             }
             lastTouchEnd = now;
 
-            // Hack focus để iOS không hiện bàn phím ảo hay thanh công cụ
-            if (document.activeElement &&
-                document.activeElement !== document.body &&
-                document.activeElement.tagName !== 'CANVAS') {
-                document.activeElement.blur();
-            }
+            // Dọn dẹp selection thừa khi nhấc tay
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) selection.removeAllRanges();
         }, { passive: false });
+
+        // 6. CHỐT CHẶN: QUẢN LÝ FOCUS
+        window.addEventListener('focusin', function (e) {
+            // Nếu ĐANG CHƠI GAME (isInputActive = false) mà có cái gì đó không phải Canvas được focus
+            // -> Blur ngay lập tức (Chặn bàn phím/toolbar hiện lên lung tung)
+            if (!window.isInputActive && e.target.tagName !== 'CANVAS') {
+                e.target.blur();
+                window.focus();
+            }
+        });
     </script>
     <script type="module" src="src/main.js"></script>
 </body>

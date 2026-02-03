@@ -16,10 +16,10 @@ export const config = {
         default: 'arcade',
         arcade: { debug: false }
     },
-    // input: {
-    //     activePointers: 3,
-    // },
-    // disableContextMenu: true,
+    input: {
+        activePointers: 3,
+    },
+    disableContextMenu: true,
 };
 
 export const GAME_SETTINGS = {
