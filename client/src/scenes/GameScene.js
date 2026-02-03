@@ -4,7 +4,6 @@ import EnvironmentManager from './EnvironmentManager.js';
 import PlayerManager from './PlayerManager.js';
 import UIManager from './UIManager.js';
 import NetworkManager from './NetworkManager.js';
-import FlashSkillManager from './FlashSkillManager.js';
 import InputManager from './InputManager.js';
 import FireworksManager from './FireworksManager.js';
 
@@ -28,7 +27,6 @@ export default class GameScene extends Phaser.Scene {
         this.players = null;
         this.ui = null;
         this.network = null;
-        this.flashSkill = null;
         this.inputs = null;
     }
 
@@ -101,7 +99,6 @@ export default class GameScene extends Phaser.Scene {
         // anims
         this.createAnimations();
 
-        // [NOTE] FireworksManager cần đảm bảo setDepth(DEPTH.FIREWORK) bên trong nó
         this.fireworks = new FireworksManager(this);
 
         // managers
@@ -113,9 +110,7 @@ export default class GameScene extends Phaser.Scene {
         this.network = new NetworkManager(this, this.state, this.players, this.ui);
         this.network.init();
 
-        this.flashSkill = new FlashSkillManager(this, this.state, this.players, this.network);
-
-        this.inputs = new InputManager(this, this.state, this.players, this.network, this.flashSkill, this.ui);
+        this.inputs = new InputManager(this, this.state, this.players, this.network, this.ui);
         this.inputs.init();
 
         this.setupResizeHandler();
@@ -224,6 +219,8 @@ export default class GameScene extends Phaser.Scene {
     }
 
     update(time) {
+        if (!this.sys.settings.active) return;
+
         if (this.players && this.network) {
             this.players.updateAllPositions(this.network);
 
@@ -273,17 +270,19 @@ export default class GameScene extends Phaser.Scene {
             }
 
             if (this.state.role === 'player' && this.players.horse) {
-                const myHorse = this.players.horse;
+                if (this.players.horse.active) {
+                    const myHorse = this.players.horse;
 
-                // Tính quãng đường đi được
-                const distanceTotal = MAP_FINISH_X - MAP_START_X;
-                const distanceCovered = myHorse.x - MAP_START_X;
+                    // Tính quãng đường đi được
+                    const distanceTotal = MAP_FINISH_X - MAP_START_X;
+                    const distanceCovered = myHorse.x - MAP_START_X;
 
-                // Tính phần trăm (0.0 -> 1.0)
-                const percent = distanceCovered / distanceTotal;
+                    // Tính phần trăm (0.0 -> 1.0)
+                    const percent = distanceCovered / distanceTotal;
 
-                // Gọi UI để update
-                this.ui.updateProgressBar(percent);
+                    // Gọi UI để update
+                    this.ui.updateProgressBar(percent);
+                }
             }
         }
 

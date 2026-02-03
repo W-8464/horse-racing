@@ -1,10 +1,9 @@
 export default class InputManager {
-    constructor(scene, state, players, network, flashSkill, ui) {
+    constructor(scene, state, players, network, ui) {
         this.scene = scene;
         this.state = state;
         this.players = players;
         this.network = network;
-        //this.flashSkill = flashSkill;
         this.ui = ui;
     }
 
@@ -13,24 +12,18 @@ export default class InputManager {
     }
 
     onPointerDown(pointer) {
-        // chặn khi winner overlay đang mở
+        // [FIX] Chỉ chặn nếu isPrimary KHẲNG ĐỊNH là false (ngón tay thứ 2 trở đi)
+        // Nếu là undefined (trên PC hoặc một số trình duyệt) thì vẫn cho qua.
+        if (pointer.isPrimary === false) return;
+
         if (this.ui.isWinnerOpen()) return;
-
-        // chỉ player mới được click để chạy
         if (this.state.role !== 'player') return;
-
-        // chỉ chạy khi race started
         if (!this.state.isRaceStarted || this.state.isFinished || !this.players.horse) return;
-
-        // click vào flash button thì bỏ qua click chạy
-        //if (this.flashSkill.isPointerOnButton(pointer)) return;
 
         this.players.moveSelfBy(10);
         this.network.emitMovement(this.players.horse.x);
 
         if (this.players.horse.requestRun) this.players.horse.requestRun(1);
         else if (this.players.horse.playRun) this.players.horse.playRun();
-
-        //this.flashSkill.registerNormalClick();
     }
 }

@@ -1,4 +1,3 @@
-// UIManager.js
 import { GAME_SETTINGS, DEPTH } from '../config/config.js';
 
 const PIXEL_INPUT_STYLE = `
@@ -556,6 +555,7 @@ export default class UIManager {
 
     destroyPodium() {
         if (this.podiumContainer) {
+            this.podiumContainer.setVisible(false);
             this.podiumContainer.destroy();
             this.podiumContainer = null;
         }
@@ -689,7 +689,7 @@ export default class UIManager {
 
     // [THÊM MỚI] Hàm cập nhật giá trị (0.0 -> 1.0)
     updateProgressBar(percent) {
-        if (!this.progressBarContainer || !this.progressBarFill) return;
+        if (!this.progressBarContainer || !this.progressBarFill || !this.progressBarFill.scene) return;
 
         // Clamp giá trị từ 0 đến 1
         const p = Phaser.Math.Clamp(percent, 0, 1);

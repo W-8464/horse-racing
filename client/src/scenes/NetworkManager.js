@@ -77,7 +77,9 @@ export default class NetworkManager {
         });
 
         this.socket.on('raceReset', (players) => {
-            this.scene.state.sounds.gallop.stop();
+            if (this.scene.state.sounds.gallop && this.scene.state.sounds.gallop.isPlaying) {
+                this.scene.state.sounds.gallop.stop();
+            }
 
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
@@ -151,7 +153,9 @@ export default class NetworkManager {
         this.socket.on('youFinished', (data) => {
             this.ui.showLocalFinishRank(data.rank);
             this.scene.state.sounds.finish.play();
-            this.scene.state.sounds.gallop.stop();
+            if (this.scene.state.sounds.gallop && this.scene.state.sounds.gallop.isPlaying) {
+                this.scene.state.sounds.gallop.stop();
+            }
         });
 
         this.socket.on('raceFinished', (data) => {
@@ -159,7 +163,9 @@ export default class NetworkManager {
             this.state.isRaceStarted = false;
             this.state.isFinished = true;
 
-            this.scene.state.sounds.gallop.stop();
+            if (this.scene.state.sounds.gallop && this.scene.state.sounds.gallop.isPlaying) {
+                this.scene.state.sounds.gallop.stop();
+            }
 
             if (this.state.role === 'host') {
                 // [FIX] Sửa tên hàm: updateHostLeaderboard -> updateLeaderboard
