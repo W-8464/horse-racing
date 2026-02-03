@@ -49,6 +49,8 @@
             position: fixed;
             /* Cố định vị trí để tránh trượt trên iOS */
             background: #222;
+            touch-action: none;
+            -ms-touch-action: none;
         }
 
         body {
@@ -130,64 +132,42 @@
     <div id="game-container"></div>
     <div id="version-tag">v2.6</div>
     <script>
-        // --- BIẾN TOÀN CỤC: CỜ BẬT/TẮT CHẾ ĐỘ NHẬP LIỆU ---
-        // false: Đang chơi game (Chặn hết)
-        // true: Đang nhập tên/pass (Cho phép gõ)
         window.isInputActive = false;
-
         let lastTouchEnd = 0;
 
         function preventDefault(e) {
             if (e.cancelable) e.preventDefault();
         }
 
+        // 1. XỬ LÝ TOUCHSTART: Chặn đa điểm & Xóa Selection
         document.addEventListener('touchstart', function (e) {
-            // Nếu chạm từ 2 ngón trở lên, chặn ngay lập tức tín hiệu truyền về iOS
+            // [QUAN TRỌNG] Xóa ngay mọi vùng chọn văn bản ngầm (nếu có)
+            // Điều này khiến iOS không kích hoạt menu Copy/Paste 3 ngón
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                selection.removeAllRanges();
+            }
+
+            // Logic chặn đa điểm cũ của bạn
             if (e.touches.length > 1) {
                 if (e.cancelable) e.preventDefault();
             }
 
-            // Nếu đang chơi game, chặn mọi hành vi mặc định của 1 ngón luôn (trừ khi là input)
-            if (!window.isInputActive && e.target.tagName !== 'INPUT') {
+            // Logic cho phép bấm nút/input
+            const tagName = e.target.tagName;
+            if (!window.isInputActive && tagName !== 'INPUT' && tagName !== 'BUTTON') {
                 if (e.cancelable) e.preventDefault();
             }
         }, { passive: false });
 
-        // 1. CHẶN BÔI ĐEN
-        document.addEventListener('selectstart', function (e) {
-            // Nếu đang ở chế độ nhập liệu và target là input -> Cho phép
-            if (window.isInputActive && e.target.tagName === 'INPUT') return;
-            preventDefault(e);
-        });
-
-        document.addEventListener('selectionchange', function () {
-            // Nếu đang chơi game mà lại có selection -> Xóa ngay
-            if (!window.isInputActive) {
-                const selection = window.getSelection();
-                if (selection && selection.rangeCount > 0) selection.removeAllRanges();
-            }
-        });
-
-        // 2. CHẶN GESTURE (ZOOM, 3 NGÓN) - Luôn chặn để tránh zoom trang
-        document.addEventListener('gesturestart', preventDefault, { passive: false });
-        document.addEventListener('gesturechange', preventDefault, { passive: false });
-        document.addEventListener('gestureend', preventDefault, { passive: false });
-
-        // 3. CHẶN MENU CHUỘT PHẢI
-        document.addEventListener('contextmenu', function (e) {
-            if (window.isInputActive && e.target.tagName === 'INPUT') return;
-            preventDefault(e);
-        });
-
-        // 4. CHẶN KÉO TRANG (TOUCHMOVE)
-        document.addEventListener('touchmove', function (e) {
-            // Luôn chặn kéo trang để cố định màn hình game
-            if (e.cancelable) e.preventDefault();
-        }, { passive: false });
-
-        // 5. XỬ LÝ DOUBLE TAP & TOUCH END
+        // 2. XỬ LÝ TOUCHEND: Chặn menu 3 ngón khi nhấc tay lên
         document.addEventListener('touchend', function (e) {
-            // Nếu đang nhập liệu thì không can thiệp (để người dùng tap vào ô input/nút bấm)
+            // [FIX MỚI] Menu 3 ngón thường hiện khi nhấc tay
+            // Nếu vừa nhấc tay mà vẫn còn ngón khác trên màn hình (thao tác đa điểm) -> chặn luôn
+            if (e.touches.length > 0 || e.changedTouches.length > 1) {
+                if (e.cancelable) e.preventDefault();
+            }
+
             if (window.isInputActive) {
                 lastTouchEnd = (new Date()).getTime();
                 return;
@@ -199,15 +179,21 @@
             }
             lastTouchEnd = now;
 
-            // Dọn dẹp selection thừa khi nhấc tay
+            // Dọn dẹp selection lần nữa cho chắc
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) selection.removeAllRanges();
         }, { passive: false });
 
-        // 6. CHỐT CHẶN: QUẢN LÝ FOCUS
+        // 3. CÁC SỰ KIỆN KHÁC (GIỮ NGUYÊN)
+        document.addEventListener('touchmove', function (e) { if (e.cancelable) e.preventDefault(); }, { passive: false });
+        document.addEventListener('selectstart', function (e) { if (window.isInputActive && e.target.tagName === 'INPUT') return; preventDefault(e); });
+        document.addEventListener('contextmenu', function (e) { if (window.isInputActive && e.target.tagName === 'INPUT') return; preventDefault(e); });
+        document.addEventListener('gesturestart', preventDefault, { passive: false });
+        document.addEventListener('gesturechange', preventDefault, { passive: false });
+        document.addEventListener('gestureend', preventDefault, { passive: false });
+
+        // 4. FOCUS LOCK
         window.addEventListener('focusin', function (e) {
-            // Nếu ĐANG CHƠI GAME (isInputActive = false) mà có cái gì đó không phải Canvas được focus
-            // -> Blur ngay lập tức (Chặn bàn phím/toolbar hiện lên lung tung)
             if (!window.isInputActive && e.target.tagName !== 'CANVAS') {
                 e.target.blur();
                 window.focus();
