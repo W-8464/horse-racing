@@ -100,12 +100,10 @@ export default class NetworkManager {
 
             if (this.state.role === 'host') {
                 this.ui.showStartButton(() => this.hostStartGame());
-                // [FIX] Host hiện lại bảng leaderboard (có nút refresh) khi reset game
                 this.ui.showLeaderboard('host');
             }
             if (this.state.role === 'player') {
                 this.ui.showWaitingText();
-                // [FIX] Player hiện lại bảng leaderboard (không nút refresh)
                 this.ui.showLeaderboard('player');
             }
         });
@@ -119,7 +117,6 @@ export default class NetworkManager {
             if (this.state.role !== 'host') return;
             this.ui.destroyHostPasswordInput();
             this.ui.showStartButton(() => this.hostStartGame());
-            // [FIX] Hiển thị leaderboard ngay khi host vào
             this.ui.showLeaderboard('host');
         });
 
@@ -168,14 +165,11 @@ export default class NetworkManager {
             }
 
             if (this.state.role === 'host') {
-                // [FIX] Sửa tên hàm: updateHostLeaderboard -> updateLeaderboard
-                // Hàm này sẽ cập nhật dữ liệu lần cuối trước khi bị Podium đè lên
                 this.ui.updateLeaderboard(data.top10);
             }
 
             const top3 = data.top10.slice(0, 3);
 
-            // [FIX] Xóa callback thừa. Logic nút "Play Again" đã nằm trong UIManager rồi.
             this.ui.showPodium(top3);
         });
 

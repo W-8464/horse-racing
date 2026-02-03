@@ -143,7 +143,7 @@ io.on('connection', (socket) => {
             }
 
             const totalPlayers = Object.keys(players).length;
-            const limit = Math.min(10, totalPlayers);
+            const limit = Math.min(3, totalPlayers);
 
             if (finishedPlayers.length >= limit) {
                 gameState.status = 'FINISHED';
