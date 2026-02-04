@@ -13,9 +13,9 @@ class RateLimiter {
         this.maxClicksPerSecond = options.maxClicksPerSecond || 15; // Max 15 clicks/sec
         this.maxClicksPerWindow = options.maxClicksPerWindow || 50; // Max 50 clicks in 5 seconds
         this.windowSize = options.windowSize || 5000; // 5 second window
-        this.uniformityThreshold = options.uniformityThreshold || 20; // Max 20ms variance for bot detection
+        this.uniformityThreshold = options.uniformityThreshold || 5; // Max 5ms variance for bot detection
         this.warningThreshold = options.warningThreshold || 0.8; // Warn at 80% of limit
-        
+
         // Player tracking: playerId -> { clicks: [], warnings: 0, blocked: false }
         this.players = new Map();
     }
@@ -27,7 +27,7 @@ class RateLimiter {
      */
     recordClick(playerId) {
         const now = Date.now();
-        
+
         // Initialize player if new
         if (!this.players.has(playerId)) {
             this.players.set(playerId, {
@@ -59,7 +59,7 @@ class RateLimiter {
         const recentClicks = player.clicks.filter(time => now - time < 1000);
         if (recentClicks.length > this.maxClicksPerSecond) {
             player.warnings++;
-            
+
             // Block after 3 warnings
             if (player.warnings >= 3) {
                 player.blocked = true;
@@ -81,7 +81,7 @@ class RateLimiter {
         // Check 2: Total clicks in window
         if (player.clicks.length > this.maxClicksPerWindow) {
             player.warnings++;
-            
+
             if (player.warnings >= 3) {
                 player.blocked = true;
                 return {
@@ -115,7 +115,7 @@ class RateLimiter {
             if (stdDev < this.uniformityThreshold && mean < 100) {
                 player.warnings += 2; // More serious offense
                 player.blocked = true;
-                
+
                 return {
                     allowed: false,
                     reason: 'BOT_PATTERN_DETECTED',

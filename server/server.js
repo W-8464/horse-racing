@@ -14,7 +14,7 @@ const rateLimiter = new RateLimiter({
     maxClicksPerSecond: 50,      // Very high - only catch extreme cases
     maxClicksPerWindow: 200,     // 200 clicks in 5 seconds
     windowSize: 5000,
-    uniformityThreshold: 15,     // Stricter bot detection
+    uniformityThreshold: 5,      // Very strict - only perfect bots
     warningThreshold: 0.9        // Warn at 90% of limit
 });
 
