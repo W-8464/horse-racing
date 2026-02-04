@@ -8,20 +8,12 @@ export default class InputManager {
     }
 
     init() {
-        // this.scene.input.on('pointerdown', (pointer) => this.onPointerDown(pointer));
-
-        this.scene.input.on('pointerdown', (pointer) => {
-            pointer.preventDefault()
-            pointer.stopPropagation()
-            return this.onPointerDown(pointer)
-        });
-
+        this.scene.input.on('pointerdown', (pointer) => this.onPointerDown(pointer));
 
 
     }
 
     onPointerDown(pointer) {
-
         if (this.ui.isWinnerOpen()) return;
         if (this.state.role !== 'player') return;
 
