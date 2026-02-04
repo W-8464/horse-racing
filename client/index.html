@@ -19,38 +19,28 @@
 
     <style>
         * {
-            /* Tắt menu hệ thống khi nhấn giữ */
             -webkit-touch-callout: none !important;
-
-            /* Tắt khả năng bôi đen văn bản */
             -webkit-user-select: none !important;
             user-select: none !important;
-
             -webkit-user-drag: none;
             -webkit-tap-highlight-color: transparent;
         }
 
-        *:not(input) {
-            -webkit-user-select: none !important;
-            user-select: none !important;
-            -webkit-touch-callout: none !important;
-            -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
-        }
-
-        /* 4. CSS để khóa màn hình tuyệt đối */
+        /* Thêm touch-action: none vào body và canvas để trình duyệt Android hiểu ngay từ đầu */
         html,
-        body {
+        body,
+        canvas,
+        #game-container {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
-            /* Chặn cuộn trang */
             position: fixed;
-            /* Cố định vị trí để tránh trượt trên iOS */
             background: #222;
-            touch-action: none;
-            -ms-touch-action: none;
+            touch-action: none !important;
+            /* QUAN TRỌNG CHO ANDROID */
+            -ms-touch-action: none !important;
         }
 
         body {
@@ -59,28 +49,12 @@
             align-items: center;
         }
 
-        #game-container {
-            width: 100vw;
-            height: 100dvh;
-            /* ✅ mobile */
-            overflow: hidden;
-        }
-
-        /* 5. Ép input không bao giờ gây zoom */
+        /* CSS input giữ nguyên */
         input {
             font-size: 16px !important;
-        }
-
-        canvas {
-            touch-action: none !important;
-            -ms-touch-action: none !important;
-            -webkit-touch-callout: none !important;
-            -webkit-user-select: none !important;
-            -moz-user-select: none !important;
-            user-select: none !important;
-            /* Loại bỏ highlight màu xanh khi tap trên Android/Zalo */
-            -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
-            outline: none !important;
+            user-select: text !important;
+            /* Cho phép chọn text trong input */
+            -webkit-user-select: text !important;
         }
 
         #version-tag {
@@ -88,14 +62,10 @@
             bottom: 10px;
             right: 10px;
             color: rgba(255, 255, 255, 0.5);
-            /* Màu trắng mờ để không gây xao nhãng */
             font-family: Arial, sans-serif;
             font-size: 12px;
             z-index: 100;
-            /* Đảm bảo luôn nằm trên cùng của game */
             pointer-events: none;
-            /* Giúp người dùng click xuyên qua thẻ này để tương tác với game */
-            user-select: none;
         }
 
         #rotate-overlay {
@@ -104,12 +74,9 @@
             background: rgba(0, 0, 0, 0.92);
             z-index: 9999;
             display: none;
-
             justify-content: center;
             align-items: center;
-
             pointer-events: all;
-            /* chặn toàn bộ thao tác */
         }
 
         #rotate-overlay.active {
@@ -130,59 +97,66 @@
 
 <body>
     <div id="game-container"></div>
-    <div id="version-tag">v2.9.1</div>
+    <div id="version-tag">v2.9.2</div>
     <script>
         window.isInputActive = false;
         let lastTouchEnd = 0;
 
-        // --- 1. CHẶN GESTURE CỦA APPLE (Menu 3 ngón, Zoom) ---
-        // Sự kiện này luôn cần chặn triệt để
+        // --- 1. CHẶN GESTURE CỦA APPLE (Giữ nguyên vì tốt cho iOS) ---
         const preventGesture = (e) => {
             if (e.cancelable) e.preventDefault();
             e.stopImmediatePropagation();
         };
-
         document.addEventListener('gesturestart', preventGesture, { passive: false, capture: true });
         document.addEventListener('gesturechange', preventGesture, { passive: false, capture: true });
         document.addEventListener('gestureend', preventGesture, { passive: false, capture: true });
 
-        // --- 2. XỬ LÝ TOUCHSTART (Tinh chỉnh) ---
+        // --- 2. XỬ LÝ TOUCHSTART (SỬA ĐỔI CHO ANDROID) ---
         document.addEventListener('touchstart', function (e) {
-            // Xóa selection để tránh menu iOS
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) selection.removeAllRanges();
-
-            const isCanvas = e.target.tagName === 'CANVAS';
             const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON';
 
-            // Nếu đang nhập liệu thì thả cho đi
             if (window.isInputActive && isInput) return;
 
-            // [LOGIC QUAN TRỌNG ĐÃ SỬA]
+            // [LOGIC MỚI] Chặn triệt để Multitouch trên mọi thiết bị
             if (e.touches.length > 1) {
-                // Nếu > 1 ngón (Multitouch) -> Chặn Default để tránh menu iOS/Zoom
-                // Nhưng KHÔNG được stopPropagation nếu là Canvas, để Phaser vẫn nhận được touch thứ 2, 3...
+                // Nếu có hơn 1 ngón tay chạm vào
                 if (e.cancelable) e.preventDefault();
-                if (!isCanvas) e.stopImmediatePropagation();
+
+                // QUAN TRỌNG: Xóa bỏ điều kiện (!isCanvas)
+                // Stop ngay lập tức để Phaser/Game KHÔNG nhận được ngón thứ 2, 3...
+                e.stopImmediatePropagation();
+                return;
             }
-            else {
-                // Nếu chỉ 1 ngón (Single Touch)
-                if (isCanvas) {
-                    // [FIX LỖI] KHÔNG gọi preventDefault() ở đây.
-                    // Hãy để sự kiện đi qua tự nhiên. CSS 'touch-action: none' đã lo việc chặn scroll.
-                    // Việc này giúp nút bấm trong game hoạt động nhạy hơn.
-                } else {
-                    // Nếu chạm vào nền đen (body) -> Chặn scroll
-                    if (e.cancelable) e.preventDefault();
-                }
+
+            // Nếu chỉ 1 ngón tay (Single Touch)
+            if (e.target.tagName !== 'CANVAS') {
+                // Nếu chạm ra ngoài game (body đen) thì chặn scroll
+                if (e.cancelable) e.preventDefault();
             }
         }, { passive: false, capture: true });
 
-        // --- 3. XỬ LÝ TOUCHEND ---
-        document.addEventListener('touchend', function (e) {
-            // Chặn hành vi nhấc tay khi đang có nhiều ngón (tránh menu hiện lúc này)
-            if (e.touches.length > 0 || e.changedTouches.length > 1) {
+        // --- 3. XỬ LÝ TOUCHMOVE (Bổ sung chặn Multitouch khi di chuyển) ---
+        document.addEventListener('touchmove', function (e) {
+            if (window.isInputActive) return;
+
+            // Nếu đang di chuyển nhiều hơn 1 ngón -> Chặn hết
+            if (e.touches.length > 1) {
                 if (e.cancelable) e.preventDefault();
+                e.stopImmediatePropagation();
+                return;
+            }
+
+            // Mặc định chặn scroll trang web
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false, capture: true });
+
+        // --- 4. TOUCHEND & CÁC SỰ KIỆN KHÁC ---
+        document.addEventListener('touchend', function (e) {
+            // Chặn hành vi nhấc tay khi đang có nhiều ngón
+            if (e.touches.length > 0 || e.changedTouches.length > 1) {
+                // Logic cũ của bạn ok, nhưng thêm stopPropagation cho chắc
+                if (e.cancelable) e.preventDefault();
+                e.stopImmediatePropagation();
             }
 
             if (window.isInputActive) {
@@ -196,16 +170,7 @@
                 if (e.cancelable) e.preventDefault();
             }
             lastTouchEnd = now;
-
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) selection.removeAllRanges();
-        }, { passive: false });
-
-        // --- 4. CÁC SỰ KIỆN KHÁC ---
-        document.addEventListener('touchmove', function (e) {
-            if (window.isInputActive) return;
-            if (e.cancelable) e.preventDefault();
-        }, { passive: false });
+        }, { passive: false, capture: true }); // Thêm capture: true để bắt sự kiện sớm nhất
 
         document.addEventListener('contextmenu', function (e) {
             if (!window.isInputActive) {
@@ -214,7 +179,6 @@
             }
         }, { passive: false });
 
-        // Focus lock
         window.addEventListener('focusin', function (e) {
             if (!window.isInputActive && e.target.tagName !== 'CANVAS' && e.target.tagName !== 'INPUT') {
                 e.target.blur();
