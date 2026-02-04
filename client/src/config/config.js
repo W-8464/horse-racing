@@ -17,7 +17,7 @@ export const config = {
         arcade: { debug: false }
     },
     input: {
-        activePointers: 3,
+        activePointers: 1,
     },
     disableContextMenu: true,
 };

@@ -437,12 +437,13 @@ export default class UIManager {
         const listContainer = this.hostLeaderboardDom.getChildByID('leaderboard-list');
         if (!listContainer) return;
 
-        // Player màn hình nhỏ, có thể chỉ nên hiện Top 5 thay vì Top 10 nếu muốn gọn
         const topCount = 10;
         const topList = sortedPlayers.slice(0, topCount);
 
-        listContainer.innerHTML = topList.map((player, index) => {
-            // [LOGIC MỚI] Lấy time trực tiếp từ object đã map ở GameScene
+        const totalPlayers = sortedPlayers.length;
+        const hiddenCount = totalPlayers - topCount;
+
+        let htmlContent = topList.map((player, index) => {
             const timeText = player.finishTime
                 ? `<span style="color:#ffeb3b; font-size:12px;">${player.finishTime}s</span>`
                 : '';
@@ -463,6 +464,16 @@ export default class UIManager {
             </div>
         `;
         }).join('');
+
+        if (hiddenCount > 0) {
+            htmlContent += `
+                <div style="display: flex; justify-content: center; align-items: center; margin-top: 8px; padding-top: 4px; border-top: 1px dashed rgba(93, 252, 155, 0.3); font-size: 12px; color: #5dfc9b; opacity: 0.8; font-style: italic;">
+                    + ${hiddenCount} others
+                </div>
+            `;
+        }
+
+        listContainer.innerHTML = htmlContent;
     }
 
     destroyWinner() {

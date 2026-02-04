@@ -19,13 +19,9 @@
 
     <style>
         * {
-            /* Tắt menu hệ thống khi nhấn giữ */
             -webkit-touch-callout: none !important;
-
-            /* Tắt khả năng bôi đen văn bản */
             -webkit-user-select: none !important;
             user-select: none !important;
-
             -webkit-user-drag: none;
             -webkit-tap-highlight-color: transparent;
         }
@@ -37,7 +33,6 @@
             -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
         }
 
-        /* 4. CSS để khóa màn hình tuyệt đối */
         html,
         body {
             margin: 0;
@@ -45,9 +40,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            /* Chặn cuộn trang */
             position: fixed;
-            /* Cố định vị trí để tránh trượt trên iOS */
             background: #222;
             touch-action: none;
             -ms-touch-action: none;
@@ -62,11 +55,11 @@
         #game-container {
             width: 100vw;
             height: 100dvh;
-            /* ✅ mobile */
             overflow: hidden;
+            /* Quan trọng cho Android Chrome: Báo hiệu không xử lý gesture */
+            touch-action: none !important;
         }
 
-        /* 5. Ép input không bao giờ gây zoom */
         input {
             font-size: 16px !important;
         }
@@ -78,7 +71,6 @@
             -webkit-user-select: none !important;
             -moz-user-select: none !important;
             user-select: none !important;
-            /* Loại bỏ highlight màu xanh khi tap trên Android/Zalo */
             -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
             outline: none !important;
         }
@@ -88,13 +80,10 @@
             bottom: 10px;
             right: 10px;
             color: rgba(255, 255, 255, 0.5);
-            /* Màu trắng mờ để không gây xao nhãng */
             font-family: Arial, sans-serif;
             font-size: 12px;
             z-index: 100;
-            /* Đảm bảo luôn nằm trên cùng của game */
             pointer-events: none;
-            /* Giúp người dùng click xuyên qua thẻ này để tương tác với game */
             user-select: none;
         }
 
@@ -104,12 +93,9 @@
             background: rgba(0, 0, 0, 0.92);
             z-index: 9999;
             display: none;
-
             justify-content: center;
             align-items: center;
-
             pointer-events: all;
-            /* chặn toàn bộ thao tác */
         }
 
         #rotate-overlay.active {
@@ -125,30 +111,17 @@
             border: 2px solid #fff;
             border-radius: 12px;
         }
-
-        #game-container,
-        canvas {
-            /* Quan trọng cho Android Chrome */
-            touch-action: none !important;
-
-            /* Các thuộc tính cũ giữ nguyên */
-            -webkit-touch-callout: none !important;
-            -webkit-user-select: none !important;
-            user-select: none !important;
-            outline: none !important;
-        }
     </style>
 </head>
 
 <body>
     <div id="game-container"></div>
-    <div id="version-tag">v2.9.2</div>
+    <div id="version-tag">v2.9.4</div>
     <script>
         window.isInputActive = false;
         let lastTouchEnd = 0;
 
         // --- 1. CHẶN GESTURE CỦA APPLE (Menu 3 ngón, Zoom) ---
-        // Sự kiện này luôn cần chặn triệt để
         const preventGesture = (e) => {
             if (e.cancelable) e.preventDefault();
             e.stopImmediatePropagation();
@@ -158,27 +131,39 @@
         document.addEventListener('gesturechange', preventGesture, { passive: false, capture: true });
         document.addEventListener('gestureend', preventGesture, { passive: false, capture: true });
 
+        // --- 2. [MỚI] CHẶN POINTER EVENTS (QUAN TRỌNG CHO ANDROID) ---
+        document.addEventListener('pointerdown', function (e) {
+            const tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SELECT') return;
+
+            if (window.isInputActive) return;
+
+            if (e.pointerType === 'touch' && !e.isPrimary) {
+                if (e.cancelable) e.preventDefault();
+                e.stopImmediatePropagation();
+            }
+        }, { capture: true, passive: false });
+
+
+        // --- 3. XỬ LÝ TOUCHSTART ---
         document.addEventListener('touchstart', function (e) {
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) selection.removeAllRanges();
 
-            const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON';
+            const tag = e.target.tagName;
 
-            // Nếu đang nhập liệu thì thả cho đi
-            if (window.isInputActive && isInput) return;
-
-            // --- SỬA ĐỔI TẠI ĐÂY ---
-            if (e.touches.length > 1) {
-                // Nếu có hơn 1 ngón tay, chặn NGAY LẬP TỨC
-                if (e.cancelable) e.preventDefault();
-
-                // Chặn sự kiện lan xuống Phaser, bất kể là Canvas hay không
-                // Điều này khiến Phaser chỉ nhìn thấy ngón tay đầu tiên
-                e.stopImmediatePropagation();
+            if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SELECT' || tag === 'TEXTAREA') {
+                return;
             }
-            // ------------------------
+
+            if (window.isInputActive) return;
+
+            if (e.targetTouches.length > 1) {
+                if (e.cancelable) e.preventDefault();
+                e.stopImmediatePropagation();
+                return;
+            }
             else {
-                // Logic cho 1 ngón tay giữ nguyên
                 const isCanvas = e.target.tagName === 'CANVAS';
                 if (!isCanvas) {
                     if (e.cancelable) e.preventDefault();
@@ -186,11 +171,28 @@
             }
         }, { passive: false, capture: true });
 
-        // --- 3. XỬ LÝ TOUCHEND ---
+        // --- 4. XỬ LÝ TOUCHMOVE ---
+        document.addEventListener('touchmove', function (e) {
+            if (e.targetTouches.length > 1) {
+                if (e.cancelable) e.preventDefault();
+                return;
+            }
+
+            if (window.isInputActive) return;
+
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
+
+        // --- 5. XỬ LÝ TOUCHEND ---
         document.addEventListener('touchend', function (e) {
-            // Chặn hành vi nhấc tay khi đang có nhiều ngón (tránh menu hiện lúc này)
+            // Nếu vẫn còn ngón tay khác trên màn hình -> Chặn hành vi mặc định
             if (e.touches.length > 0 || e.changedTouches.length > 1) {
                 if (e.cancelable) e.preventDefault();
+            }
+
+            const tag = e.target.tagName;
+            if (tag === 'BUTTON' || tag === 'INPUT') {
+                return;
             }
 
             if (window.isInputActive) {
@@ -209,20 +211,6 @@
             if (selection && selection.rangeCount > 0) selection.removeAllRanges();
         }, { passive: false });
 
-        document.addEventListener('touchmove', function (e) {
-            // 1. Ưu tiên cao nhất: Nếu là đa điểm -> CHẶN TUYỆT ĐỐI (cho Android)
-            if (e.touches.length > 1) {
-                if (e.cancelable) e.preventDefault();
-                return; // Dừng luôn, không quan tâm input active hay không
-            }
-
-            // 2. Nếu đang nhập liệu 1 ngón -> Cho phép (để scroll text input)
-            if (window.isInputActive) return;
-
-            // 3. Còn lại -> Chặn (để không kéo trang web)
-            if (e.cancelable) e.preventDefault();
-        }, { passive: false });
-
         document.addEventListener('contextmenu', function (e) {
             if (!window.isInputActive) {
                 if (e.cancelable) e.preventDefault();
@@ -230,7 +218,6 @@
             }
         }, { passive: false });
 
-        // Focus lock
         window.addEventListener('focusin', function (e) {
             if (!window.isInputActive && e.target.tagName !== 'CANVAS' && e.target.tagName !== 'INPUT') {
                 e.target.blur();
