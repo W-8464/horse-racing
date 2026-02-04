@@ -10,7 +10,8 @@ export default class ClickValidator {
         this.throttleMs = options.throttleMs || 50; // Minimum time between clicks
         this.warningThreshold = 20; // Show warning at 10 clicks/sec
 
-        this.clicks = [];
+        this.clicks = []; // For rate limiting (last 1 second)
+        this.clickHistory = []; // For auto-click detection (last 20 clicks)
         this.lastClickTime = 0;
         this.isThrottled = false;
         this.warningActive = false;
@@ -28,17 +29,22 @@ export default class ClickValidator {
             return {
                 allowed: false,
                 throttled: true,
-                warning: false,
-                message: 'Clicking too fast!'
+                warning: false
             };
         }
 
         // Add current click
         this.clicks.push(now);
+        this.clickHistory.push(now); // Also add to history for auto-click detection
         this.lastClickTime = now;
 
-        // Remove old clicks (older than 1 second)
+        // Remove old clicks (older than 1 second) for rate limiting
         this.clicks = this.clicks.filter(time => now - time < 1000);
+
+        // Keep only last 20 clicks in history for auto-click detection
+        if (this.clickHistory.length > 20) {
+            this.clickHistory.shift();
+        }
 
         // Check rate
         if (this.clicks.length > this.maxClicksPerSecond) {
@@ -53,11 +59,11 @@ export default class ClickValidator {
             };
         }
 
-        // [NEW] Auto-click detection: Check for uniform timing patterns
-        if (this.clicks.length >= 20) {
+        // [FIXED] Auto-click detection: Chỉ cần 10 clicks liên tiếp là đủ
+        if (this.clickHistory.length >= 10) {
             const intervals = [];
-            for (let i = 1; i < Math.min(this.clicks.length, 20); i++) {
-                intervals.push(this.clicks[i] - this.clicks[i - 1]);
+            for (let i = 1; i < this.clickHistory.length; i++) {
+                intervals.push(this.clickHistory[i] - this.clickHistory[i - 1]);
             }
 
             // Calculate variance of intervals
@@ -80,14 +86,11 @@ export default class ClickValidator {
             }
         }
 
-        // Show warning if approaching limit
-        const showWarning = this.clicks.length >= this.warningThreshold;
-
+        // No warning for normal clicks
         return {
             allowed: true,
             throttled: false,
-            warning: showWarning,
-            message: showWarning ? 'Slow down!' : null
+            warning: false
         };
     }
 
@@ -96,6 +99,7 @@ export default class ClickValidator {
      */
     reset() {
         this.clicks = [];
+        this.clickHistory = [];
         this.lastClickTime = 0;
         this.isThrottled = false;
         this.warningActive = false;

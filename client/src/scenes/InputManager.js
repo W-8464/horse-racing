@@ -40,15 +40,11 @@ export default class InputManager {
                 this.showWarning(validation.message, false); // Red warning
                 // Reset validator to prevent further clicks
                 this.clickValidator.reset();
-            } else {
-                this.showWarning(validation.message);
+            } else if (validation.message) {
+                // Only show message if there is one (rate limit, not throttle)
+                this.showWarning(validation.message, false);
             }
             return;
-        }
-
-        // Show warning if approaching limit
-        if (validation.warning && validation.message) {
-            this.showWarning(validation.message, true);
         }
 
         // Process the click
