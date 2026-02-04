@@ -683,11 +683,10 @@ export default class UIManager {
     showProgressBar() {
         if (this.progressBarContainer) return;
 
-        const width = 400; // Chiều rộng thanh
-        const height = 20; // Chiều cao thanh
-        const borderColor = 0x5dfc9b; // Màu xanh neon (giống theme)
-        const bgColor = 0x003b1f;     // Màu xanh đậm
-        const fillColor = 0xffeb3b;   // Màu vàng (nổi bật)
+        const width = 400;
+        const height = 30; // --- SỬA: Tăng chiều cao lên 30 để chứa vừa chữ
+        const borderColor = 0x5dfc9b;
+        const bgColor = 0x003b1f;
 
         this.progressBarContainer = this.scene.add.container(0, 0).setDepth(DEPTH.UI).setScrollFactor(0);
 
@@ -698,18 +697,29 @@ export default class UIManager {
         bg.fillRoundedRect(-width / 2, -height / 2, width, height, 10);
         bg.strokeRoundedRect(-width / 2, -height / 2, width, height, 10);
 
-        // 2. Vẽ thanh fill (Ban đầu width = 0)
+        // 2. Vẽ thanh fill
         this.progressBarFill = this.scene.add.graphics();
-        // Lưu reference width/height để dùng lúc update
-        this.progressBarFill.defaultWidth = width - 4; // Trừ viền
+        this.progressBarFill.defaultWidth = width - 4;
         this.progressBarFill.defaultHeight = height - 4;
         this.progressBarFill.defaultX = -width / 2 + 2;
         this.progressBarFill.defaultY = -height / 2 + 2;
 
-        // Vẽ trạng thái ban đầu (rỗng)
+        // --- SỬA: Đưa text vào giữa (y=0) và chỉnh lại size ---
+        this.progressText = this.scene.add.text(0, 0, '0%', {
+            fontSize: '18px', // Size 18 nhìn sẽ cân đối trong thanh cao 30
+            fontFamily: 'monospace',
+            fontStyle: 'bold',
+            color: '#ffffff',
+            stroke: '#000000', // Viền đen giúp chữ nổi bật trên nền vàng/xanh
+            strokeThickness: 4
+        }).setOrigin(0.5); // Canh giữa tâm
+        // -----------------------------------------------------
+
+        // Vẽ trạng thái ban đầu
         this.updateProgressBar(0);
 
-        this.progressBarContainer.add([bg, this.progressBarFill]);
+        // Quan trọng: Add text vào SAU CÙNG để nó nằm đè lên trên thanh fill màu vàng
+        this.progressBarContainer.add([bg, this.progressBarFill, this.progressText]);
 
         this.layout();
     }
@@ -737,5 +747,12 @@ export default class UIManager {
                 4
             );
         }
+
+        // --- THÊM MỚI: Cập nhật nội dung text ---
+        if (this.progressText) {
+            const displayPercent = Math.floor(p * 100);
+            this.progressText.setText(`${displayPercent}%`);
+        }
+        // ---------------------------------------
     }
 }

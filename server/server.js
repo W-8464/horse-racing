@@ -70,7 +70,7 @@ io.on('connection', (socket) => {
         const SKY_HEIGHT = 110;
         const TOP_MARGIN = 20;
         const LANE_HEIGHT = 40;
-        const MAX_LANES = 7;
+        const MAX_LANES = 8;
 
         let assignedIndex;
         if (availableIndexes.length > 0) {

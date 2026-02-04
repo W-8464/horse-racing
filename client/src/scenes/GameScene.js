@@ -70,6 +70,8 @@ export default class GameScene extends Phaser.Scene {
         });
 
         this.load.image('flash_icon', 'assets/images/flash.png');
+        this.load.image('vantivaLogo', 'assets/images/logo_vantiva_carre-Photoroom.png');
+        this.load.image('cbdLogo', 'assets/images/images (3)-Photoroom.png');
 
         this.load.audio('countdown_full', 'assets/sounds/countdown.mp3');
         this.load.audio('gallop', 'assets/sounds/gallop.mp3');

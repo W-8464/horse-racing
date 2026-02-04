@@ -210,10 +210,7 @@ export default class EnvironmentManager {
 
         // Dùng Container để gom nhóm
         this.grandstandContainer = this.scene.add.container(0, 0);
-        this.grandstandContainer.setDepth(DEPTH.GRASS - 1);
-
-        // --- SỬA Ở ĐÂY: Đổi từ 0.25 thành 1 ---
-        // 1 nghĩa là di chuyển 1:1 theo Camera (cùng tốc độ với đường chạy)
+        this.grandstandContainer.setDepth(DEPTH.GRASS - 1); // Đảm bảo bạn đã import DEPTH
         this.grandstandContainer.setScrollFactor(1);
 
         const sectionWidth = 320;
@@ -224,12 +221,10 @@ export default class EnvironmentManager {
         const stepHeight = 10;
         const steps = 2;
 
-        // Biến đếm để xác định nội dung chữ
         let sectionIndex = 0;
 
         for (let x = 20; x < worldWidth; x += (sectionWidth + gapWidth)) {
-
-            // 1. Vẽ Biển Quảng Cáo (Vẽ trước tiên để nằm sau cùng)
+            // 1. Vẽ Biển Quảng Cáo
             const boardW = sectionWidth - 40;
             const boardH = 50;
             const boardX = x + 20;
@@ -245,66 +240,107 @@ export default class EnvironmentManager {
             board.fillRect(boardX, boardY, boardW, boardH);
             board.lineStyle(2, 0x333333);
             board.strokeRect(boardX, boardY, boardW, boardH);
-            // Nội dung nền biển
+            // Nền biển
             board.fillStyle(0x87CEEB);
             board.fillRect(boardX + 4, boardY + 4, boardW - 8, boardH - 8);
 
             this.grandstandContainer.add(board);
 
-            // Thêm chữ vào biển quảng cáo
-            const textContent = sectionIndex % 2 === 0 ? "CBD" : "VANTIVA";
+            // Tọa độ tâm biển
+            const centerX = boardX + boardW / 2;
+            const centerY = boardY + boardH / 2;
 
-            // Tính vị trí giữa biển
-            const textX = boardX + boardW / 2;
-            const textY = boardY + boardH / 2;
+            if (sectionIndex % 2 === 0) {
+                if (this.scene.textures.exists('cbdLogo')) {
+                    const textStr = "CBD";
+                    const spacing = 15;
+                    const logoTargetH = 40;
 
-            const boardText = this.scene.add.text(textX, textY, textContent, {
-                fontSize: '28px',
-                fontFamily: 'Arial Black, Arial, sans-serif',
-                color: '#333333',
-                align: 'center',
-                resolution: 1
-            });
-            boardText.setOrigin(0.5);
-            this.grandstandContainer.add(boardText);
+                    const textStyle = {
+                        fontSize: '24px',
+                        fontFamily: 'Verdana, Arial, sans-serif',
+                        fontStyle: 'bold italic',
+                        color: '#002060',
+                        resolution: 1
+                    };
 
-            // 2. Chuẩn bị đối tượng vẽ Ghế Gỗ
+                    const tempText = this.scene.add.text(0, 0, textStr, textStyle).setVisible(false);
+                    const textW = tempText.width;
+                    tempText.destroy();
+
+                    const tempLogo = this.scene.textures.get('cbdLogo').getSourceImage();
+                    const scale = logoTargetH / tempLogo.height;
+                    const logoW = tempLogo.width * scale;
+                    const totalContentW = textW + spacing + logoW;
+                    const startX = centerX - (totalContentW / 2);
+                    const logoCenterX = startX + (logoW / 2);
+                    const logo = this.scene.add.image(logoCenterX, centerY, 'cbdLogo');
+                    logo.setScale(scale);
+                    this.grandstandContainer.add(logo);
+
+                    // 6. VẼ CHỮ CBD (Bên Phải)
+                    // Tọa độ chữ = startX + độ rộng logo + khoảng cách
+                    const textX = startX + logoW + spacing;
+                    const boardText = this.scene.add.text(textX, centerY, textStr, textStyle);
+                    boardText.setOrigin(0, 0.5); // Neo ở cạnh trái
+                    this.grandstandContainer.add(boardText);
+
+                } else {
+                    // Fallback: Chỉ hiện chữ CBD cũ nếu chưa load ảnh
+                    const boardText = this.scene.add.text(centerX, centerY, "CBD", {
+                        fontSize: '28px',
+                        fontFamily: 'Arial Black, Arial, sans-serif',
+                        color: '#333333',
+                        align: 'center'
+                    }).setOrigin(0.5);
+                    this.grandstandContainer.add(boardText);
+                }
+            } else {
+                // === TRƯỜNG HỢP LẺ: LOGO VANTIVA (Chỉ Ảnh) ===
+                if (this.scene.textures.exists('vantivaLogo')) {
+                    const logo = this.scene.add.image(centerX, centerY, 'vantivaLogo');
+                    const scaleFactor = 150 / logo.height; // Scale về chiều cao 35px
+                    logo.setScale(scaleFactor);
+                    this.grandstandContainer.add(logo);
+                } else {
+                    // Fallback
+                    const boardText = this.scene.add.text(centerX, centerY, "VANTIVA", {
+                        fontSize: '24px',
+                        fontFamily: 'Arial Black, Arial, sans-serif',
+                        color: '#333333',
+                        align: 'center'
+                    }).setOrigin(0.5);
+                    this.grandstandContainer.add(boardText);
+                }
+            }
+
+            // 2. Vẽ Ghế Gỗ (Giữ nguyên)
             const stand = this.scene.add.graphics();
             this.grandstandContainer.add(stand);
 
-            // Vẽ tường chắn 2 bên hông
             stand.fillStyle(0x5c4033);
             stand.fillRect(x - 5, startY - (steps * stepHeight), 5, steps * stepHeight);
             stand.fillRect(x + sectionWidth, startY - (steps * stepHeight), 5, steps * stepHeight);
 
-            // 3. Vòng lặp vẽ bậc ghế và đặt người (Từ cao xuống thấp)
             for (let i = steps - 1; i >= 0; i--) {
                 const color = i % 2 === 0 ? 0x8b4513 : 0xa0522d;
                 const currentY = startY - ((i + 1) * stepHeight);
 
-                // Vẽ bậc ghế
                 stand.fillStyle(color);
                 stand.fillRect(x, currentY, sectionWidth, stepHeight);
-
-                // Bóng đổ nhẹ
                 stand.fillStyle(0x000000, 0.2);
                 stand.fillRect(x, currentY, sectionWidth, 2);
 
-                // Đặt Người (Khán giả)
                 const peopleCount = Math.floor(Math.random() * 8) + 3;
                 for (let p = 0; p < peopleCount; p++) {
                     const px = x + Math.random() * (sectionWidth - 20) + 10;
-                    // Chỉnh toạ độ Y: +5 để chân người thấp hơn mép ghế một chút
                     const py = currentY + 5;
-
                     const skinId = Math.floor(Math.random() * 6);
                     const spectator = this.scene.add.image(px, py, `spectatorPixel_${skinId}`);
-                    spectator.setOrigin(0.5, 1); // Neo ở chân
+                    spectator.setOrigin(0.5, 1);
                     this.grandstandContainer.add(spectator);
                 }
             }
-
-            // Tăng biến đếm sau mỗi khu vực khán đài
             sectionIndex++;
         }
     }
@@ -312,7 +348,7 @@ export default class EnvironmentManager {
     _setupTrack() {
         const TOP_MARGIN = 20;
         const LANE_HEIGHT = 40;
-        const MAX_LANES = 7;
+        const MAX_LANES = 8;
 
         const trackStartY = this.skyHeight + TOP_MARGIN;
         const trackHeight = LANE_HEIGHT * MAX_LANES;
@@ -398,7 +434,7 @@ export default class EnvironmentManager {
         const graphics = this.scene.add.graphics();
         const TOP_MARGIN = 20;
         const LANE_HEIGHT = 40;
-        const MAX_LANES = 7;
+        const MAX_LANES = 8;
         const startY = this.skyHeight + TOP_MARGIN;
         const endY = startY + (LANE_HEIGHT * MAX_LANES);
         const topWidth = 24;
