@@ -83,9 +83,10 @@ export default class NetworkManager {
                 this.scene.state.sounds.gallop.stop();
             }
 
+            this.renderBuffer = [];
+
             this.state.isRaceStarted = false;
             this.state.isFinished = false;
-
             this.scene.state.finishedPlayers = [];
 
             if (this.scene.fireworks) {

@@ -191,12 +191,12 @@ io.on('connection', (socket) => {
         io.emit('raceReset', players);
     });
 
-    socket.on('resetRace', () => {
-        finishedPlayers = [];
-        gameState.status = 'LOBBY';
-        Object.values(players).forEach(p => p.x = 150);
-        io.emit('raceReset', players);
-    });
+    // socket.on('resetRace', () => {
+    //     finishedPlayers = [];
+    //     gameState.status = 'LOBBY';
+    //     Object.values(players).forEach(p => p.x = 150);
+    //     io.emit('raceReset', players);
+    // });
 });
 
 const PORT = process.env.PORT || 3000;
