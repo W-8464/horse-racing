@@ -9,11 +9,13 @@ const io = require('socket.io')(http, {
 const path = require('path');
 const RateLimiter = require('./RateLimiter');
 
-// Initialize rate limiter for anti-auto-click protection
+// Initialize rate limiter with relaxed thresholds (server-side safety net only)
 const rateLimiter = new RateLimiter({
-    maxClicksPerSecond: 15,
-    maxClicksPerWindow: 50,
-    windowSize: 5000
+    maxClicksPerSecond: 50,      // Very high - only catch extreme cases
+    maxClicksPerWindow: 200,     // 200 clicks in 5 seconds
+    windowSize: 5000,
+    uniformityThreshold: 15,     // Stricter bot detection
+    warningThreshold: 0.9        // Warn at 90% of limit
 });
 
 app.use(express.static(path.join(__dirname, '../client')));
