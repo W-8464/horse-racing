@@ -11,7 +11,7 @@ export default class ClickValidator {
         this.warningThreshold = options.warningThreshold || 20; // Show warning at 10 clicks/sec
 
         this.clicks = []; // For rate limiting (last 1 second)
-        this.clickHistory = []; // For auto-click detection (last 20 clicks)
+        this.clickHistory = []; // For auto-click detection (last 40 clicks)
         this.lastClickTime = 0;
         this.isThrottled = false;
         this.warningActive = false;
@@ -62,78 +62,67 @@ export default class ClickValidator {
         // Remove old clicks (older than 1 second) for rate limiting
         this.clicks = this.clicks.filter(time => now - time < 1000);
 
-        // Keep only last 20 clicks in history for auto-click detection
-        if (this.clickHistory.length > 20) {
-            this.clickHistory.shift();
+        const intervals = [];
+        for (let i = 1; i < this.clickHistory.length; i++) {
+            intervals.push(this.clickHistory[i] - this.clickHistory[i - 1]);
         }
 
-        // Auto-click detection will handle fast clicking patterns
-        // No need for separate rate limit check here
+        // Calculate variance of intervals
+        const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+        const variance = intervals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / intervals.length;
+        const stdDev = Math.sqrt(variance);
 
-        // [FIXED] Auto-click detection: Cần 20 clicks liên tiếp để phát hiện
-        if (this.clickHistory.length >= 20) {
-            const intervals = [];
-            for (let i = 1; i < this.clickHistory.length; i++) {
-                intervals.push(this.clickHistory[i] - this.clickHistory[i - 1]);
-            }
+        // Phát hiện auto-click nếu:
+        // 1. Độ lệch chuẩn < 5ms (clicks quá đều)
+        // 2. Tốc độ nhanh (mean < 150ms)
+        if (stdDev < 5 && mean < 150) {
+            // Set 3-second penalty
+            this.isPenalized = true;
+            this.penaltyEndTime = now + 3000; // 3 seconds from now
 
-            // Calculate variance of intervals
-            const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-            const variance = intervals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / intervals.length;
-            const stdDev = Math.sqrt(variance);
+            return {
+                allowed: false,
+                throttled: false,
+                warning: true,
+                message: 'Auto-click detected!',
+                autoClickDetected: true,
+                penaltyTime: 3
+            };
+        }
+    }
 
-            // Tính hệ số biến thiên (coefficient of variation)
-            // Nếu độ lệch chuẩn < 10% giá trị trung bình → click quá đều → auto-click
-            const coefficientOfVariation = (stdDev / mean) * 100;
-
-            if (coefficientOfVariation < 10 && mean < 150) {
-                // Set 3-second penalty
-                this.isPenalized = true;
-                this.penaltyEndTime = now + 3000; // 3 seconds from now
-
-                return {
-                    allowed: false,
-                    throttled: false,
-                    warning: true,
-                    message: 'Auto-click detected!',
-                    autoClickDetected: true,
-                    penaltyTime: 3
-                };
-            }
+            // No warning for normal clicks
+            return {
+    allowed: true,
+    throttled: false,
+    warning: false
+};
         }
 
-        // No warning for normal clicks
-        return {
-            allowed: true,
-            throttled: false,
-            warning: false
-        };
-    }
-
-    /**
-     * Reset click history (e.g., when game restarts)
-     */
-    reset() {
-        this.clicks = [];
-        this.clickHistory = [];
-        this.lastClickTime = 0;
-        this.isThrottled = false;
-        this.warningActive = false;
-    }
-
-    /**
-     * Get current click rate
-     */
-    getClickRate() {
-        const now = Date.now();
-        const recentClicks = this.clicks.filter(time => now - time < 1000);
-        return recentClicks.length;
-    }
-
-    /**
-     * Check if currently being throttled
-     */
-    isCurrentlyThrottled() {
-        return Date.now() - this.lastClickTime < this.throttleMs;
-    }
+/**
+ * Reset click history (e.g., when game restarts)
+ */
+reset() {
+    this.clicks = [];
+    this.clickHistory = [];
+    this.lastClickTime = 0;
+    this.isThrottled = false;
+    this.warningActive = false;
 }
+
+/**
+ * Get current click rate
+ */
+getClickRate() {
+    const now = Date.now();
+    const recentClicks = this.clicks.filter(time => now - time < 1000);
+    return recentClicks.length;
+}
+
+/**
+ * Check if currently being throttled
+ */
+isCurrentlyThrottled() {
+    return Date.now() - this.lastClickTime < this.throttleMs;
+}
+    }
