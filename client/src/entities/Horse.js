@@ -54,7 +54,16 @@ export default class Horse extends Phaser.Physics.Arcade.Sprite {
     preUpdate(time, delta) {
         super.preUpdate(time, delta);
         if (this.nameText) {
-            this.nameText.setPosition(this.x, this.y - 40);
+            // Only update if position changed significantly (optimization)
+            const targetX = this.x;
+            const targetY = this.y - 40;
+            if (!this._lastNameX || !this._lastNameY ||
+                Math.abs(targetX - this._lastNameX) > 0.5 ||
+                Math.abs(targetY - this._lastNameY) > 0.5) {
+                this.nameText.setPosition(targetX, targetY);
+                this._lastNameX = targetX;
+                this._lastNameY = targetY;
+            }
         }
     }
 

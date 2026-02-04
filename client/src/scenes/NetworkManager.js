@@ -208,6 +208,18 @@ export default class NetworkManager {
             window.location.reload();
         });
 
+        // Handle rate limit warnings from server
+        this.socket.on('rateLimitWarning', (data) => {
+            if (data.blocked) {
+                // Player has been blocked for cheating
+                alert('You have been disconnected for suspicious activity (auto-clicking detected).');
+                window.location.reload();
+            } else if (data.reason === 'APPROACHING_LIMIT') {
+                // Soft warning - show in UI via InputManager
+                console.warn('[RATE LIMIT] Approaching click limit');
+            }
+        });
+
         this.socket.off('playerMoved');
     }
 

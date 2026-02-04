@@ -1,3 +1,6 @@
+// Detect mobile devices
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 export const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
@@ -14,12 +17,26 @@ export const config = {
     },
     physics: {
         default: 'arcade',
-        arcade: { debug: false }
+        arcade: {
+            debug: false,
+            // Reduce physics update rate on mobile for better performance
+            fps: isMobile ? 30 : 60
+        }
     },
     input: {
         activePointers: 1,
     },
     disableContextMenu: true,
+    // Performance optimizations
+    fps: {
+        target: isMobile ? 30 : 60,
+        forceSetTimeOut: isMobile
+    },
+    render: {
+        pixelArt: false,
+        antialias: !isMobile, // Disable antialiasing on mobile for performance
+        roundPixels: true
+    }
 };
 
 export const GAME_SETTINGS = {
@@ -34,7 +51,12 @@ export const GAME_SETTINGS = {
     COUNTDOWN_TIME: 3,
     TICK_RATE: 20,
     INPUT_BATCH_MS: 50,
-    CLICK_STEP_DISTANCE: 10
+    CLICK_STEP_DISTANCE: 10,
+
+    // Mobile-specific settings
+    IS_MOBILE: isMobile,
+    REDUCE_SPECTATORS: isMobile, // Reduce spectator count on mobile
+    LEADERBOARD_UPDATE_RATE: isMobile ? 300 : 200 // Update less frequently on mobile
 };
 
 export const DEPTH = {

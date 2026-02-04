@@ -331,7 +331,11 @@ export default class EnvironmentManager {
                 stand.fillStyle(0x000000, 0.2);
                 stand.fillRect(x, currentY, sectionWidth, 2);
 
-                const peopleCount = Math.floor(Math.random() * 8) + 3;
+                // Reduce spectator count on mobile for performance
+                const isMobile = GAME_SETTINGS.IS_MOBILE || false;
+                const maxPeople = isMobile ? 5 : 8;
+                const minPeople = isMobile ? 2 : 3;
+                const peopleCount = Math.floor(Math.random() * maxPeople) + minPeople;
                 for (let p = 0; p < peopleCount; p++) {
                     const px = x + Math.random() * (sectionWidth - 20) + 10;
                     const py = currentY + 5;

@@ -7,6 +7,14 @@ const io = require('socket.io')(http, {
     pingInterval: 10000
 });
 const path = require('path');
+const RateLimiter = require('./RateLimiter');
+
+// Initialize rate limiter for anti-auto-click protection
+const rateLimiter = new RateLimiter({
+    maxClicksPerSecond: 15,
+    maxClicksPerWindow: 50,
+    windowSize: 5000
+});
 
 app.use(express.static(path.join(__dirname, '../client')));
 
@@ -104,6 +112,11 @@ io.on('connection', (socket) => {
 
         Object.values(players).forEach(p => p.x = 100);
 
+        // Reset rate limiter for all players at game start
+        Object.keys(players).forEach(playerId => {
+            rateLimiter.resetPlayer(playerId);
+        });
+
         gameState.status = 'COUNTDOWN';
         io.emit('startCountdown');
 
@@ -119,6 +132,47 @@ io.on('connection', (socket) => {
         if (!player) return;
         const alreadyFinished = finishedPlayers.find(p => p.id === socket.id);
         if (alreadyFinished) return;
+
+        // Anti-auto-click protection
+        const rateCheck = rateLimiter.recordClick(socket.id);
+
+        if (!rateCheck.allowed) {
+            // Send warning or block message to client
+            socket.emit('rateLimitWarning', {
+                reason: rateCheck.reason,
+                blocked: rateCheck.reason.includes('BLOCKED') || rateCheck.reason.includes('BOT'),
+                warningCount: rateCheck.warningCount || 0
+            });
+
+            // If blocked permanently, disconnect
+            if (rateCheck.reason.includes('BLOCKED') || rateCheck.reason.includes('BOT')) {
+                console.log(`[ANTI-CHEAT] Player ${socket.id} blocked: ${rateCheck.reason}`);
+                socket.disconnect(true);
+            }
+            return;
+        }
+
+        // Send soft warning if approaching limit
+        if (rateCheck.warning) {
+            socket.emit('rateLimitWarning', {
+                reason: rateCheck.reason,
+                blocked: false,
+                warningCount: rateCheck.warningCount || 0
+            });
+        }
+
+        // Validate movement data
+        if (typeof data.x !== 'number' || isNaN(data.x)) {
+            console.warn(`[VALIDATION] Invalid x position from ${socket.id}`);
+            return;
+        }
+
+        // Prevent teleporting (max movement per click is 15 pixels)
+        const maxMovement = 20; // Allow some buffer for network latency
+        if (data.x - player.x > maxMovement) {
+            console.warn(`[VALIDATION] Suspicious movement from ${socket.id}: ${data.x - player.x}px`);
+            data.x = player.x + maxMovement; // Cap the movement
+        }
 
         player.x = data.x;
 
@@ -176,6 +230,9 @@ io.on('connection', (socket) => {
             availableIndexes.sort((a, b) => a - b);
         }
 
+        // Clean up rate limiter tracking
+        rateLimiter.removePlayer(socket.id);
+
         playerIndexMap.delete(socket.id);
         delete players[socket.id];
         io.emit('playerDisconnected', socket.id);
@@ -187,6 +244,11 @@ io.on('connection', (socket) => {
         finishedPlayers = [];
         gameState.status = 'LOBBY';
         Object.values(players).forEach(p => p.x = 100);
+
+        // Reset rate limiter for all players
+        Object.keys(players).forEach(playerId => {
+            rateLimiter.resetPlayer(playerId);
+        });
 
         io.emit('raceReset', players);
     });

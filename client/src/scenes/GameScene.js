@@ -246,7 +246,8 @@ export default class GameScene extends Phaser.Scene {
 
             // [LOGIC MỚI] Sửa lại phần update Leaderboard
             if (!this.state.isFinished) {
-                if (!this.lastLeaderboardUpdate || time - this.lastLeaderboardUpdate > 200) {
+                const updateRate = GAME_SETTINGS.LEADERBOARD_UPDATE_RATE || 200;
+                if (!this.lastLeaderboardUpdate || time - this.lastLeaderboardUpdate > updateRate) {
 
                     // 1. Lấy danh sách những người đã về đích từ state (do Server gửi về)
                     const finishedPlayers = this.state.finishedPlayers || [];

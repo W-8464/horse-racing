@@ -1,3 +1,5 @@
+import { DEPTH } from '../config/config.js';
+
 export default class FireworksManager {
     constructor(scene) {
         this.scene = scene;
@@ -62,7 +64,8 @@ export default class FireworksManager {
 
         emitter.setScrollFactor(0);
 
-        emitter.setDepth(30001);
+        // Use proper DEPTH constant instead of hardcoded value
+        emitter.setDepth(DEPTH.FIREWORK);
 
         emitter.explode(40);
 

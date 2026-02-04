@@ -118,18 +118,23 @@ export default class PlayerManager {
             const nameDepth = horseObj.y + (DEPTH.NAME_OFFSET || 1000);
             horseObj.nameText.setDepth(nameDepth);
         }
+
+        // Cache last Y to avoid unnecessary updates
+        horseObj._lastDepthY = horseObj.y;
     }
 
-    // [NEW] Hàm này sẽ được gọi trong update() của Scene
+    // [OPTIMIZED] Only update depths when Y changes significantly
     updateDepths() {
         // 1. Ngựa mình
-        if (this.horse) {
+        if (this.horse && (!this.horse._lastDepthY || Math.abs(this.horse.y - this.horse._lastDepthY) > 1)) {
             this._updateHorseDepth(this.horse);
         }
         // 2. Ngựa khác
         if (this.otherPlayers) {
             this.otherPlayers.children.iterate((child) => {
-                this._updateHorseDepth(child);
+                if (!child._lastDepthY || Math.abs(child.y - child._lastDepthY) > 1) {
+                    this._updateHorseDepth(child);
+                }
             });
         }
     }
