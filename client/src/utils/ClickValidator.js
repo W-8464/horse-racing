@@ -65,8 +65,11 @@ export default class ClickValidator {
             const variance = intervals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / intervals.length;
             const stdDev = Math.sqrt(variance);
 
-            // If clicks are too uniform (standard deviation < 15ms), likely auto-clicker
-            if (stdDev < 15 && mean < 200) {
+            // Tính hệ số biến thiên (coefficient of variation)
+            // Nếu độ lệch chuẩn < 10% giá trị trung bình → click quá đều → auto-click
+            const coefficientOfVariation = (stdDev / mean) * 100;
+
+            if (coefficientOfVariation < 10 && mean < 500) {
                 return {
                     allowed: false,
                     throttled: false,
