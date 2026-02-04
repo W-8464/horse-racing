@@ -17,6 +17,9 @@ export default class InputManager {
 
         this.warningText = null;
         this.warningTimeout = null;
+
+        this.countdownText = null;
+        this.countdownInterval = null;
     }
 
     init() {
@@ -35,9 +38,17 @@ export default class InputManager {
         const validation = this.clickValidator.validateClick();
 
         if (!validation.allowed) {
+            // Check if penalized (countdown timer)
+            if (validation.penalized && validation.remainingTime) {
+                this.showCountdown(validation.remainingTime);
+                return;
+            }
+
             // Special handling for auto-click detection
             if (validation.autoClickDetected) {
                 this.showWarning(validation.message, false); // Red warning
+                // Start 3-second countdown
+                this.startPenaltyCountdown(3);
                 // Reset validator to prevent further clicks
                 this.clickValidator.reset();
             } else if (validation.message) {
@@ -92,6 +103,56 @@ export default class InputManager {
         }, 1500);
     }
 
+    startPenaltyCountdown(seconds) {
+        // Clear any existing countdown
+        if (this.countdownInterval) {
+            clearInterval(this.countdownInterval);
+        }
+
+        let remaining = seconds;
+        this.showCountdown(remaining);
+
+        this.countdownInterval = setInterval(() => {
+            remaining--;
+            if (remaining > 0) {
+                this.showCountdown(remaining);
+            } else {
+                this.hideCountdown();
+                clearInterval(this.countdownInterval);
+                this.countdownInterval = null;
+            }
+        }, 1000);
+    }
+
+    showCountdown(number) {
+        if (!this.countdownText) {
+            const { width, height } = this.scene.scale;
+            this.countdownText = this.scene.add.text(
+                width / 2,
+                height / 2,
+                number.toString(),
+                {
+                    fontSize: '120px',
+                    fontFamily: 'monospace',
+                    color: '#ff1744',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 10,
+                    align: 'center'
+                }
+            ).setOrigin(0.5).setDepth(7000).setScrollFactor(0);
+        } else {
+            this.countdownText.setText(number.toString());
+        }
+    }
+
+    hideCountdown() {
+        if (this.countdownText) {
+            this.countdownText.destroy();
+            this.countdownText = null;
+        }
+    }
+
     reset() {
         this.clickValidator.reset();
         if (this.warningText) {
@@ -102,6 +163,11 @@ export default class InputManager {
             clearTimeout(this.warningTimeout);
             this.warningTimeout = null;
         }
+        if (this.countdownInterval) {
+            clearInterval(this.countdownInterval);
+            this.countdownInterval = null;
+        }
+        this.hideCountdown();
     }
 
     destroy() {

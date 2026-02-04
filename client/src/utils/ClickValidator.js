@@ -15,6 +15,10 @@ export default class ClickValidator {
         this.lastClickTime = 0;
         this.isThrottled = false;
         this.warningActive = false;
+
+        // Penalty timer for auto-click detection
+        this.isPenalized = false;
+        this.penaltyEndTime = 0;
     }
 
     /**
@@ -23,6 +27,23 @@ export default class ClickValidator {
      */
     validateClick() {
         const now = Date.now();
+
+        // Check if player is currently penalized
+        if (this.isPenalized) {
+            const remainingTime = Math.ceil((this.penaltyEndTime - now) / 1000);
+            if (remainingTime > 0) {
+                return {
+                    allowed: false,
+                    penalized: true,
+                    remainingTime: remainingTime,
+                    message: `Penalty: ${remainingTime}s`
+                };
+            } else {
+                // Penalty expired
+                this.isPenalized = false;
+                this.penaltyEndTime = 0;
+            }
+        }
 
         // Throttle: Minimum time between clicks
         if (now - this.lastClickTime < this.throttleMs) {
@@ -59,8 +80,8 @@ export default class ClickValidator {
             };
         }
 
-        // [FIXED] Auto-click detection: Chỉ cần 10 clicks liên tiếp là đủ
-        if (this.clickHistory.length >= 10) {
+        // [FIXED] Auto-click detection: Cần 15 clicks liên tiếp để phát hiện
+        if (this.clickHistory.length >= 15) {
             const intervals = [];
             for (let i = 1; i < this.clickHistory.length; i++) {
                 intervals.push(this.clickHistory[i] - this.clickHistory[i - 1]);
@@ -76,12 +97,17 @@ export default class ClickValidator {
             const coefficientOfVariation = (stdDev / mean) * 100;
 
             if (coefficientOfVariation < 10 && mean < 500) {
+                // Set 3-second penalty
+                this.isPenalized = true;
+                this.penaltyEndTime = now + 3000; // 3 seconds from now
+
                 return {
                     allowed: false,
                     throttled: false,
                     warning: true,
                     message: 'Auto-click detected!',
-                    autoClickDetected: true
+                    autoClickDetected: true,
+                    penaltyTime: 3
                 };
             }
         }
