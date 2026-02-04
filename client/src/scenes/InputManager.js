@@ -35,7 +35,14 @@ export default class InputManager {
         const validation = this.clickValidator.validateClick();
 
         if (!validation.allowed) {
-            this.showWarning(validation.message);
+            // Special handling for auto-click detection
+            if (validation.autoClickDetected) {
+                this.showWarning(validation.message, false); // Red warning
+                // Reset validator to prevent further clicks
+                this.clickValidator.reset();
+            } else {
+                this.showWarning(validation.message);
+            }
             return;
         }
 

@@ -53,6 +53,30 @@ export default class ClickValidator {
             };
         }
 
+        // [NEW] Auto-click detection: Check for uniform timing patterns
+        if (this.clicks.length >= 20) {
+            const intervals = [];
+            for (let i = 1; i < Math.min(this.clicks.length, 20); i++) {
+                intervals.push(this.clicks[i] - this.clicks[i - 1]);
+            }
+
+            // Calculate variance of intervals
+            const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+            const variance = intervals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / intervals.length;
+            const stdDev = Math.sqrt(variance);
+
+            // If clicks are too uniform (standard deviation < 15ms), likely auto-clicker
+            if (stdDev < 15 && mean < 200) {
+                return {
+                    allowed: false,
+                    throttled: false,
+                    warning: true,
+                    message: 'Auto-click detected!',
+                    autoClickDetected: true
+                };
+            }
+        }
+
         // Show warning if approaching limit
         const showWarning = this.clicks.length >= this.warningThreshold;
 
