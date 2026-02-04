@@ -10,8 +10,8 @@ export default class InputManager {
 
         // Initialize click validator
         this.clickValidator = new ClickValidator({
-            maxClicksPerSecond: 25,
-            throttleMs: 60,
+            maxClicksPerSecond: 30,
+            throttleMs: 50,
             warningThreshold: 15
         })
 

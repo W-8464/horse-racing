@@ -6,7 +6,7 @@
 
 export default class ClickValidator {
     constructor(options = {}) {
-        this.maxClicksPerSecond = options.maxClicksPerSecond || 12; // Slightly lower than server
+        this.maxClicksPerSecond = options.maxClicksPerSecond || 30; // Slightly lower than server
         this.throttleMs = options.throttleMs || 50; // Minimum time between clicks
         this.warningThreshold = options.warningThreshold || 20; // Show warning at 10 clicks/sec
 
