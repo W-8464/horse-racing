@@ -67,30 +67,8 @@ export default class ClickValidator {
             this.clickHistory.shift();
         }
 
-        // Check rate - only if clicking faster than 150ms per click
-        if (this.clicks.length > this.maxClicksPerSecond) {
-            // Calculate average interval between recent clicks
-            if (this.clicks.length >= 2) {
-                const intervals = [];
-                for (let i = 1; i < Math.min(this.clicks.length, 10); i++) {
-                    intervals.push(this.clicks[i] - this.clicks[i - 1]);
-                }
-                const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-
-                // Only trigger rate limit if average interval < 150ms
-                if (avgInterval < 150) {
-                    // Remove the click we just added
-                    this.clicks.pop();
-
-                    return {
-                        allowed: false,
-                        throttled: false,
-                        warning: true,
-                        message: 'Rate limit reached!'
-                    };
-                }
-            }
-        }
+        // Auto-click detection will handle fast clicking patterns
+        // No need for separate rate limit check here
 
         // [FIXED] Auto-click detection: Cần 20 clicks liên tiếp để phát hiện
         if (this.clickHistory.length >= 20) {
@@ -108,7 +86,7 @@ export default class ClickValidator {
             // Nếu độ lệch chuẩn < 10% giá trị trung bình → click quá đều → auto-click
             const coefficientOfVariation = (stdDev / mean) * 100;
 
-            if (coefficientOfVariation < 10 && mean < 500) {
+            if (coefficientOfVariation < 10 && mean < 150) {
                 // Set 3-second penalty
                 this.isPenalized = true;
                 this.penaltyEndTime = now + 3000; // 3 seconds from now
