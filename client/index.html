@@ -125,12 +125,24 @@
             border: 2px solid #fff;
             border-radius: 12px;
         }
+
+        #game-container,
+        canvas {
+            /* Quan trọng cho Android Chrome */
+            touch-action: none !important;
+
+            /* Các thuộc tính cũ giữ nguyên */
+            -webkit-touch-callout: none !important;
+            -webkit-user-select: none !important;
+            user-select: none !important;
+            outline: none !important;
+        }
     </style>
 </head>
 
 <body>
     <div id="game-container"></div>
-    <div id="version-tag">v2.9.1</div>
+    <div id="version-tag">v2.9.2</div>
     <script>
         window.isInputActive = false;
         let lastTouchEnd = 0;
@@ -146,33 +158,29 @@
         document.addEventListener('gesturechange', preventGesture, { passive: false, capture: true });
         document.addEventListener('gestureend', preventGesture, { passive: false, capture: true });
 
-        // --- 2. XỬ LÝ TOUCHSTART (Tinh chỉnh) ---
         document.addEventListener('touchstart', function (e) {
-            // Xóa selection để tránh menu iOS
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) selection.removeAllRanges();
 
-            const isCanvas = e.target.tagName === 'CANVAS';
             const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON';
 
             // Nếu đang nhập liệu thì thả cho đi
             if (window.isInputActive && isInput) return;
 
-            // [LOGIC QUAN TRỌNG ĐÃ SỬA]
+            // --- SỬA ĐỔI TẠI ĐÂY ---
             if (e.touches.length > 1) {
-                // Nếu > 1 ngón (Multitouch) -> Chặn Default để tránh menu iOS/Zoom
-                // Nhưng KHÔNG được stopPropagation nếu là Canvas, để Phaser vẫn nhận được touch thứ 2, 3...
+                // Nếu có hơn 1 ngón tay, chặn NGAY LẬP TỨC
                 if (e.cancelable) e.preventDefault();
-                if (!isCanvas) e.stopImmediatePropagation();
+
+                // Chặn sự kiện lan xuống Phaser, bất kể là Canvas hay không
+                // Điều này khiến Phaser chỉ nhìn thấy ngón tay đầu tiên
+                e.stopImmediatePropagation();
             }
+            // ------------------------
             else {
-                // Nếu chỉ 1 ngón (Single Touch)
-                if (isCanvas) {
-                    // [FIX LỖI] KHÔNG gọi preventDefault() ở đây.
-                    // Hãy để sự kiện đi qua tự nhiên. CSS 'touch-action: none' đã lo việc chặn scroll.
-                    // Việc này giúp nút bấm trong game hoạt động nhạy hơn.
-                } else {
-                    // Nếu chạm vào nền đen (body) -> Chặn scroll
+                // Logic cho 1 ngón tay giữ nguyên
+                const isCanvas = e.target.tagName === 'CANVAS';
+                if (!isCanvas) {
                     if (e.cancelable) e.preventDefault();
                 }
             }
@@ -201,9 +209,17 @@
             if (selection && selection.rangeCount > 0) selection.removeAllRanges();
         }, { passive: false });
 
-        // --- 4. CÁC SỰ KIỆN KHÁC ---
         document.addEventListener('touchmove', function (e) {
+            // 1. Ưu tiên cao nhất: Nếu là đa điểm -> CHẶN TUYỆT ĐỐI (cho Android)
+            if (e.touches.length > 1) {
+                if (e.cancelable) e.preventDefault();
+                return; // Dừng luôn, không quan tâm input active hay không
+            }
+
+            // 2. Nếu đang nhập liệu 1 ngón -> Cho phép (để scroll text input)
             if (window.isInputActive) return;
+
+            // 3. Còn lại -> Chặn (để không kéo trang web)
             if (e.cancelable) e.preventDefault();
         }, { passive: false });
 
