@@ -8,7 +8,7 @@ export default class ClickValidator {
     constructor(options = {}) {
         this.maxClicksPerSecond = options.maxClicksPerSecond || 12; // Slightly lower than server
         this.throttleMs = options.throttleMs || 50; // Minimum time between clicks
-        this.warningThreshold = 20; // Show warning at 10 clicks/sec
+        this.warningThreshold = options.warningThreshold || 20; // Show warning at 10 clicks/sec
 
         this.clicks = []; // For rate limiting (last 1 second)
         this.clickHistory = []; // For auto-click detection (last 20 clicks)
@@ -67,21 +67,33 @@ export default class ClickValidator {
             this.clickHistory.shift();
         }
 
-        // Check rate
+        // Check rate - only if clicking faster than 150ms per click
         if (this.clicks.length > this.maxClicksPerSecond) {
-            // Remove the click we just added
-            this.clicks.pop();
+            // Calculate average interval between recent clicks
+            if (this.clicks.length >= 2) {
+                const intervals = [];
+                for (let i = 1; i < Math.min(this.clicks.length, 10); i++) {
+                    intervals.push(this.clicks[i] - this.clicks[i - 1]);
+                }
+                const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
 
-            return {
-                allowed: false,
-                throttled: false,
-                warning: true,
-                message: 'Rate limit reached!'
-            };
+                // Only trigger rate limit if average interval < 150ms
+                if (avgInterval < 150) {
+                    // Remove the click we just added
+                    this.clicks.pop();
+
+                    return {
+                        allowed: false,
+                        throttled: false,
+                        warning: true,
+                        message: 'Rate limit reached!'
+                    };
+                }
+            }
         }
 
-        // [FIXED] Auto-click detection: Cần 15 clicks liên tiếp để phát hiện
-        if (this.clickHistory.length >= 15) {
+        // [FIXED] Auto-click detection: Cần 20 clicks liên tiếp để phát hiện
+        if (this.clickHistory.length >= 20) {
             const intervals = [];
             for (let i = 1; i < this.clickHistory.length; i++) {
                 intervals.push(this.clickHistory[i] - this.clickHistory[i - 1]);
