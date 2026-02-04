@@ -159,6 +159,8 @@
         document.addEventListener('gestureend', preventGesture, { passive: false, capture: true });
 
         document.addEventListener('touchstart', function (e) {
+
+            e.preventDefault();
             const selection = window.getSelection();
             if (selection && selection.rangeCount > 0) selection.removeAllRanges();
 
@@ -169,8 +171,7 @@
 
             // --- SỬA ĐỔI TẠI ĐÂY ---
             if (e.touches.length > 1) {
-                // Nếu có hơn 1 ngón tay, chặn NGAY LẬP TỨC
-                if (e.cancelable) e.preventDefault();
+
 
                 // Chặn sự kiện lan xuống Phaser, bất kể là Canvas hay không
                 // Điều này khiến Phaser chỉ nhìn thấy ngón tay đầu tiên
