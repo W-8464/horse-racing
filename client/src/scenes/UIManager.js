@@ -331,6 +331,8 @@ export default class UIManager {
             this.countdownText.destroy();
             this.countdownText = null;
         }
+
+        this.destroyToast();
     }
 
     startCountdown() {
@@ -765,5 +767,100 @@ export default class UIManager {
             this.progressText.setText(`${displayPercent}%`);
         }
         // ---------------------------------------
+    }
+
+    showToast(message, isError = true) {
+        // 1. Xóa toast cũ nếu đang hiện (để tránh chồng chéo)
+        this.destroyToast();
+
+        const { cx, cy, h } = this._getLayout();
+
+        // Vị trí: Cách cạnh trên 15% (dưới thanh Progress Bar một chút)
+        const yPos = h * 0.15;
+
+        // 2. Tạo Container
+        this.toastContainer = this.scene.add.container(cx, yPos)
+            .setDepth(DEPTH.OVERLAY + 10) // Đảm bảo nổi lên trên cùng (hơn cả Overlay)
+            .setScrollFactor(0)
+            .setAlpha(0); // Bắt đầu ẩn để fade-in
+
+        // 3. Cấu hình màu sắc
+        // Lỗi/Cảnh báo: Nền Đỏ, Chữ Trắng, Viền Vàng
+        // Thông báo thường: Nền Đen, Chữ Xanh, Viền Xanh
+        const bgColor = isError ? 0xff1744 : 0x000000;
+        const strokeColor = isError ? 0xffeb3b : 0x5dfc9b;
+        const textColor = '#ffffff';
+
+        // 4. Tạo Text trước để đo kích thước
+        const textObj = this.scene.add.text(0, 0, message, {
+            fontSize: '24px',
+            fontFamily: 'monospace',
+            fontStyle: 'bold',
+            color: textColor,
+            align: 'center',
+            wordWrap: { width: 400 } // Tự xuống dòng nếu quá dài
+        }).setOrigin(0.5);
+
+        // 5. Vẽ khung nền dựa trên kích thước text
+        const padding = 20;
+        const bgW = textObj.width + padding * 2;
+        const bgH = textObj.height + padding * 1.5;
+
+        const bg = this.scene.add.graphics();
+        bg.fillStyle(bgColor, 0.95);
+        bg.lineStyle(3, strokeColor, 1);
+        bg.fillRoundedRect(-bgW / 2, -bgH / 2, bgW, bgH, 8);
+        bg.strokeRoundedRect(-bgW / 2, -bgH / 2, bgW, bgH, 8);
+
+        // 6. Thêm icon cảnh báo (nếu là lỗi)
+        if (isError) {
+            const icon = this.scene.add.text(-bgW / 2 + 15, -2, "⚠️", { fontSize: '20px' }).setOrigin(0.5);
+            this.toastContainer.add(icon);
+        }
+
+        // Add vào container
+        this.toastContainer.add([bg, textObj]);
+
+        // 7. Hiệu ứng xuất hiện (Tween)
+        this.scene.tweens.add({
+            targets: this.toastContainer,
+            alpha: 1,
+            y: yPos + 20, // Trượt nhẹ xuống
+            scale: { from: 0.8, to: 1 }, // Phóng to nhẹ
+            duration: 300,
+            ease: 'Back.out'
+        });
+
+        // 8. Tự động tắt sau 3 giây (hoặc 5 giây nếu là lỗi dài)
+        const duration = isError ? 4000 : 2500;
+        this.toastTimer = this.scene.time.delayedCall(duration, () => {
+            this.hideToast();
+        });
+    }
+
+    hideToast() {
+        if (!this.toastContainer) return;
+
+        // Hiệu ứng biến mất
+        this.scene.tweens.add({
+            targets: this.toastContainer,
+            alpha: 0,
+            y: this.toastContainer.y - 20, // Bay lên
+            duration: 300,
+            onComplete: () => {
+                this.destroyToast();
+            }
+        });
+    }
+
+    destroyToast() {
+        if (this.toastTimer) {
+            this.scene.time.removeEvent(this.toastTimer);
+            this.toastTimer = null;
+        }
+        if (this.toastContainer) {
+            this.toastContainer.destroy();
+            this.toastContainer = null;
+        }
     }
 }
