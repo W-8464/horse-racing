@@ -380,10 +380,14 @@ export default class UIManager {
                 }
 
                 txt.setText('GO!');
-                this.state.isRaceStarted = true;
-                this.state.isCountdownRunning = false;
+                // Keep countdown running until GO! disappears
+                // this.state.isRaceStarted will be set after 800ms
 
                 this.scene.time.delayedCall(800, () => {
+                    // NOW start the race
+                    this.state.isRaceStarted = true;
+                    this.state.isCountdownRunning = false;
+
                     // Kiểm tra lại lần nữa trước khi destroy
                     if (this.countdownText && this.countdownText.scene) {
                         this.countdownText.destroy();
@@ -404,7 +408,8 @@ export default class UIManager {
 
         this.hostLeaderboardDom = this.scene.add.dom(0, 0).createFromHTML(`
         <div id="unified-leaderboard" style="${LEADERBOARD_CONTAINER_STYLE}">
-            <div style="display: flex; justify-content: center; align-items: center; border-bottom: 2px solid #ffeb3b; margin-bottom: 10px; padding-bottom: 5px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ffeb3b; margin-bottom: 10px; padding-bottom: 5px;">
+                <span id="player-count" style="color:#5dfc9b; font-size:14px; font-family: 'Courier New', monospace;">0 Players</span>
                 <h2 style="color:#ffeb3b; margin:0; font-size:18px; font-family: 'Courier New', monospace;">LEADERBOARD</h2>
                 ${restartBtnHTML} 
             </div>
@@ -435,6 +440,7 @@ export default class UIManager {
         if (!this.hostLeaderboardDom) return;
 
         const listContainer = this.hostLeaderboardDom.getChildByID('leaderboard-list');
+        const playerCountElement = this.hostLeaderboardDom.getChildByID('player-count');
         if (!listContainer) return;
 
         const topCount = 10;
@@ -442,6 +448,11 @@ export default class UIManager {
 
         const totalPlayers = sortedPlayers.length;
         const hiddenCount = totalPlayers - topCount;
+
+        // Update player count
+        if (playerCountElement) {
+            playerCountElement.innerHTML = `${totalPlayers} Player${totalPlayers !== 1 ? 's' : ''}`;
+        }
 
         let htmlContent = topList.map((player, index) => {
             const timeText = player.finishTime

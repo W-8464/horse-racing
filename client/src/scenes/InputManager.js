@@ -47,8 +47,8 @@ export default class InputManager {
             // Special handling for auto-click detection
             if (validation.autoClickDetected) {
                 this.showWarning(validation.message, false); // Red warning
-                // Start 3-second countdown
-                this.startPenaltyCountdown(3);
+                // Start 5-second countdown
+                this.startPenaltyCountdown(5);
                 // Reset validator to prevent further clicks
                 this.clickValidator.reset();
             } else if (validation.message) {

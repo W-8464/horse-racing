@@ -11,7 +11,7 @@ export default class ClickValidator {
         this.warningThreshold = options.warningThreshold || 20; // Show warning at 10 clicks/sec
 
         this.clicks = []; // For rate limiting (last 1 second)
-        this.clickHistory = []; // For auto-click detection (last 40 clicks)
+        this.clickHistory = []; // For auto-click detection (last 35 clicks)
         this.lastClickTime = 0;
         this.isThrottled = false;
         this.warningActive = false;
@@ -62,16 +62,16 @@ export default class ClickValidator {
         // Remove old clicks (older than 1 second) for rate limiting
         this.clicks = this.clicks.filter(time => now - time < 1000);
 
-        // Keep only last 40 clicks in history for auto-click detection
-        if (this.clickHistory.length > 40) {
+        // Keep only last 35 clicks in history for auto-click detection
+        if (this.clickHistory.length > 35) {
             this.clickHistory.shift();
         }
 
         // Auto-click detection will handle fast clicking patterns
         // No need for separate rate limit check here
 
-        // [FIXED] Auto-click detection: Cần 40 clicks liên tiếp để phát hiện
-        if (this.clickHistory.length >= 40) {
+        // [FIXED] Auto-click detection: Cần 35 clicks liên tiếp để phát hiện
+        if (this.clickHistory.length >= 35) {
             const intervals = [];
             for (let i = 1; i < this.clickHistory.length; i++) {
                 intervals.push(this.clickHistory[i] - this.clickHistory[i - 1]);
@@ -84,11 +84,11 @@ export default class ClickValidator {
 
             // Phát hiện auto-click nếu:
             // 1. Độ lệch chuẩn < 5ms (clicks quá đều)
-            // 2. Tốc độ nhanh (mean < 150ms)
-            if (stdDev < 5 && mean < 150) {
-                // Set 3-second penalty
+            // 2. Tốc độ nhanh (mean < 200ms)
+            if (stdDev < 5 && mean <= 200) {
+                // Set 5-second penalty
                 this.isPenalized = true;
-                this.penaltyEndTime = now + 3000; // 3 seconds from now
+                this.penaltyEndTime = now + 5000; // 5 seconds from now
 
                 return {
                     allowed: false,
@@ -96,7 +96,7 @@ export default class ClickValidator {
                     warning: true,
                     message: 'Auto-click detected!',
                     autoClickDetected: true,
-                    penaltyTime: 3
+                    penaltyTime: 5
                 };
             }
         }
