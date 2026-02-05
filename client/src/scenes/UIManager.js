@@ -52,8 +52,7 @@ const REFRESH_BTN_STYLE = `
     display: flex;
     align-items: center;
     transition: transform 0.1s;
-    position: absolute;
-    right: 24px;
+    margin-left: 8px;
 `;
 
 export default class UIManager {
