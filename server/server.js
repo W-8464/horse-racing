@@ -9,7 +9,7 @@ const io = require('socket.io')(http, {
 const path = require('path');
 const RateLimiter = require('./RateLimiter');
 
-// Initialize rate limiter with relaxed thresholds (server-side safety net only)
+// Initialize rate limiter with relaxed thresholds (server-side safety net only) ok
 const rateLimiter = new RateLimiter({
     maxClicksPerSecond: 50,      // Very high - only catch extreme cases
     maxClicksPerWindow: 200,     // 200 clicks in 5 seconds
